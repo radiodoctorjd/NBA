@@ -3,542 +3,142 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NBA ELO Prediction Model</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<title>NBA Prediction Model</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --nba-red: #C8102E;
-    --nba-blue: #1D428A;
-    --nba-gold: #FDB927;
-    --bg: #0d0f14;
-    --surface: #151820;
-    --surface2: #1e2230;
-    --border: rgba(255,255,255,0.07);
-    --text: #f0f2f7;
-    --muted: #7a7f94;
-    --radius: 14px;
-    --font-display: 'Bebas Neue', sans-serif;
-    --font-body: 'DM Sans', sans-serif;
-    --font-mono: 'DM Mono', monospace;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    font-family: var(--font-body);
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* ── HEADER ── */
-  header {
-    background: linear-gradient(135deg, #0d0f14 0%, #1a1030 50%, #0d0f14 100%);
-    border-bottom: 1px solid var(--border);
-    padding: 1.5rem 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    backdrop-filter: blur(10px);
-  }
-
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .logo-icon {
-    width: 42px; height: 42px;
-    background: var(--nba-red);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px;
-    flex-shrink: 0;
-  }
-
-  .logo h1 {
-    font-family: var(--font-display);
-    font-size: 2rem;
-    letter-spacing: 2px;
-    color: var(--text);
-    line-height: 1;
-  }
-
-  .logo span {
-    font-family: var(--font-body);
-    font-size: 0.7rem;
-    color: var(--muted);
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    display: block;
-    margin-top: 2px;
-  }
-
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .api-input-wrap {
-    position: relative;
-  }
-
-  .api-input-wrap input {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    padding: 8px 12px;
-    border-radius: 8px;
-    width: 320px;
-    outline: none;
-    transition: border 0.2s;
-  }
-
-  .api-input-wrap input:focus {
-    border-color: var(--nba-gold);
-  }
-
-  .api-input-wrap label {
-    position: absolute;
-    top: -9px; left: 10px;
-    font-size: 0.65rem;
-    color: var(--nba-gold);
-    background: var(--bg);
-    padding: 0 4px;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-  }
-
-  .btn-refresh {
-    background: var(--nba-red);
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    padding: 9px 18px;
-    font-family: var(--font-body);
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s, transform 0.1s;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .btn-refresh:hover { background: #a30d24; }
-  .btn-refresh:active { transform: scale(0.97); }
-  .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  /* ── TABS ── */
-  .tabs-bar {
-    display: flex;
-    gap: 0;
-    padding: 1.5rem 2rem 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .tab {
-    padding: 10px 28px;
-    font-family: var(--font-display);
-    font-size: 1.2rem;
-    letter-spacing: 2px;
-    color: var(--muted);
-    cursor: pointer;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s;
-    user-select: none;
-  }
-
-  .tab:hover { color: var(--text); }
-
-  .tab.active {
-    color: var(--nba-gold);
-    border-bottom-color: var(--nba-gold);
-  }
-
-  .tab-badge {
-    display: inline-block;
-    background: var(--surface2);
-    color: var(--muted);
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
-    padding: 2px 7px;
-    border-radius: 20px;
-    margin-left: 8px;
-    vertical-align: middle;
-    transition: all 0.2s;
-  }
-
-  .tab.active .tab-badge {
-    background: var(--nba-gold);
-    color: #000;
-  }
-
-  /* ── MAIN ── */
-  main {
-    padding: 2rem;
-    max-width: 1400px;
-    margin: 0 auto;
-  }
-
-  .status-bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.75rem;
-    color: var(--muted);
-    margin-bottom: 1.5rem;
-    font-family: var(--font-mono);
-  }
-
-  .status-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--muted);
-  }
-  .status-dot.live { background: #2ed573; animation: pulse 2s infinite; }
-  .status-dot.error { background: var(--nba-red); }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-
-  /* ── GRID ── */
-  .games-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-    gap: 1.25rem;
-  }
-
-  /* ── GAME CARD ── */
-  .game-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    transition: transform 0.2s, box-shadow 0.2s;
-    animation: fadeUp 0.4s ease both;
-  }
-
-  .game-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 40px rgba(0,0,0,0.4);
-  }
-
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  /* stagger */
-  .game-card:nth-child(1) { animation-delay: 0.05s; }
-  .game-card:nth-child(2) { animation-delay: 0.10s; }
-  .game-card:nth-child(3) { animation-delay: 0.15s; }
-  .game-card:nth-child(4) { animation-delay: 0.20s; }
-  .game-card:nth-child(5) { animation-delay: 0.25s; }
-  .game-card:nth-child(6) { animation-delay: 0.30s; }
-
-  /* Card header */
-  .card-head {
-    padding: 14px 16px 10px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .tipoff {
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--nba-gold);
-    letter-spacing: 1px;
-  }
-
-  .finalist-badge {
-    background: linear-gradient(135deg, var(--nba-gold), #e8a400);
-    color: #000;
-    font-size: 0.6rem;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    padding: 3px 8px;
-    border-radius: 4px;
-  }
-
-  /* Matchup bar */
-  .matchup {
-    padding: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .team-block {
-    flex: 1;
-    text-align: center;
-  }
-
-  .team-block.home { text-align: right; }
-  .team-block.away { text-align: left; }
-
-  .team-abbr {
-    font-family: var(--font-display);
-    font-size: 2.2rem;
-    letter-spacing: 1px;
-    line-height: 1;
-    color: var(--text);
-  }
-
-  .team-name-full {
-    font-size: 0.65rem;
-    color: var(--muted);
-    margin-top: 3px;
-    line-height: 1.3;
-  }
-
-  .win-pct {
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    margin-top: 6px;
-  }
-
-  .win-pct.fav { color: #2ed573; font-weight: 600; }
-  .win-pct.dog { color: var(--muted); }
-
-  .vs-block {
-    text-align: center;
-    flex-shrink: 0;
-    width: 48px;
-  }
-
-  .vs-text {
-    font-family: var(--font-display);
-    font-size: 1rem;
-    color: var(--muted);
-    letter-spacing: 2px;
-  }
-
-  .elo-diff {
-    font-family: var(--font-mono);
-    font-size: 0.6rem;
-    color: var(--muted);
-    margin-top: 4px;
-  }
-
-  /* Probability bar */
-  .prob-bar-wrap {
-    padding: 0 16px 12px;
-  }
-
-  .prob-bar {
-    height: 6px;
-    border-radius: 3px;
-    overflow: hidden;
-    background: var(--surface2);
-    display: flex;
-  }
-
-  .prob-bar-away {
-    height: 100%;
-    background: var(--nba-blue);
-    transition: width 0.8s cubic-bezier(.22,.68,0,1.2);
-  }
-
-  .prob-bar-home {
-    height: 100%;
-    background: var(--nba-red);
-    flex: 1;
-  }
-
-  .prob-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.6rem;
-    color: var(--muted);
-    margin-top: 4px;
-    font-family: var(--font-mono);
-  }
-
-  /* Stats grid */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1px;
-    background: var(--border);
-    border-top: 1px solid var(--border);
-  }
-
-  .stat-section {
-    background: var(--surface);
-    padding: 12px 14px;
-  }
-
-  .stat-section-title {
-    font-family: var(--font-display);
-    font-size: 0.85rem;
-    letter-spacing: 2px;
-    color: var(--muted);
-    margin-bottom: 10px;
-    text-transform: uppercase;
-  }
-
-  .stat-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 6px;
-  }
-
-  .stat-label {
-    font-size: 0.7rem;
-    color: var(--muted);
-  }
-
-  .stat-value {
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--text);
-  }
-
-  .stat-value.highlight {
-    color: var(--nba-gold);
-    font-weight: 600;
-  }
-
-  .stat-value.winner-tag {
-    background: rgba(200,16,46,0.15);
-    color: var(--nba-red);
-    padding: 2px 7px;
-    border-radius: 4px;
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-  }
-
-  /* Winner strip */
-  .winner-strip {
-    padding: 10px 16px;
-    background: rgba(200,16,46,0.08);
-    border-top: 1px solid rgba(200,16,46,0.2);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .winner-label {
-    font-size: 0.65rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-
-  .winner-name {
-    font-family: var(--font-display);
-    font-size: 1rem;
-    letter-spacing: 1px;
-    color: var(--nba-red);
-  }
-
-  .h1-winner-name {
-    font-family: var(--font-display);
-    font-size: 0.9rem;
-    color: var(--nba-blue);
-    text-align: right;
-  }
-
-  /* Empty state */
-  .empty-state {
-    text-align: center;
-    padding: 5rem 2rem;
-    color: var(--muted);
-  }
-
-  .empty-state .icon { font-size: 3.5rem; margin-bottom: 1rem; }
-  .empty-state h3 { font-family: var(--font-display); font-size: 1.8rem; letter-spacing: 2px; margin-bottom: 0.5rem; color: var(--text); }
-  .empty-state p { font-size: 0.85rem; line-height: 1.6; }
-
-  /* Finals promo banner */
-  .finals-banner {
-    background: linear-gradient(135deg, #1D428A 0%, #0d0f14 40%, #C8102E 100%);
-    border: 1px solid rgba(253,185,39,0.3);
-    border-radius: var(--radius);
-    padding: 1.2rem 1.5rem;
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .finals-banner .icon { font-size: 2.5rem; flex-shrink: 0; }
-
-  .finals-banner h2 {
-    font-family: var(--font-display);
-    font-size: 1.6rem;
-    letter-spacing: 3px;
-    color: var(--nba-gold);
-  }
-
-  .finals-banner p {
-    font-size: 0.8rem;
-    color: rgba(255,255,255,0.7);
-    margin-top: 2px;
-  }
-
-  .finals-series {
-    margin-left: auto;
-    text-align: right;
-  }
-
-  .series-score {
-    font-family: var(--font-display);
-    font-size: 2.5rem;
-    letter-spacing: 4px;
-    color: var(--text);
-  }
-
-  .series-label {
-    font-size: 0.65rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 2px;
-  }
-
-  /* Loading skeleton */
-  .skeleton {
-    background: linear-gradient(90deg, var(--surface) 25%, var(--surface2) 50%, var(--surface) 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-radius: 8px;
-    height: 200px;
-  }
-
-  @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
-
-  /* Responsive */
-  @media (max-width: 768px) {
-    header { flex-direction: column; gap: 12px; padding: 1rem; }
-    .api-input-wrap input { width: 260px; }
-    .tabs-bar { padding: 1rem 1rem 0; }
-    main { padding: 1rem; }
-    .games-grid { grid-template-columns: 1fr; }
-    .finals-banner { flex-wrap: wrap; }
-    .finals-series { margin-left: 0; }
-  }
+:root {
+  --red:#C8102E; --blue:#1D428A; --gold:#FDB927;
+  --bg:#0d0f14; --s1:#151820; --s2:#1e2230; --s3:#252a3a;
+  --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.12);
+  --text:#f0f2f7; --muted:#7a7f94; --radius:14px;
+  --ff-d:'Bebas Neue',sans-serif; --ff-b:'DM Sans',sans-serif; --ff-m:'DM Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--ff-b);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* HEADER */
+header{background:linear-gradient(135deg,#0d0f14 0%,#1a1030 50%,#0d0f14 100%);border-bottom:1px solid var(--border);padding:1.25rem 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(10px)}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{width:40px;height:40px;background:var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.logo h1{font-family:var(--ff-d);font-size:1.8rem;letter-spacing:2px;line-height:1}
+.logo span{font-size:.65rem;color:var(--muted);letter-spacing:3px;text-transform:uppercase;display:block;margin-top:2px}
+.header-right{display:flex;align-items:center;gap:10px}
+.btn{background:var(--red);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-family:var(--ff-b);font-size:1rem;letter-spacing:1px;cursor:pointer;transition:background .2s,transform .1s;display:flex;align-items:center;gap:6px}
+.btn:hover{background:#a30d24}.btn:active{transform:scale(.97)}.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* TABS */
+.tabs{display:flex;gap:0;padding:1.25rem 2rem 0;border-bottom:1px solid var(--border)}
+.tab{padding:10px 24px;font-family:var(--ff-d);font-size:1.1rem;letter-spacing:2px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;transition:all .2s;user-select:none}
+.tab:hover{color:var(--text)}.tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.badge{display:inline-block;background:var(--s2);color:var(--muted);font-family:var(--ff-m);font-size:.6rem;padding:2px 7px;border-radius:20px;margin-left:6px;vertical-align:middle;transition:all .2s}
+.tab.active .badge{background:var(--gold);color:#000}
+
+/* MAIN */
+main{padding:1.5rem 2rem;max-width:1440px;margin:0 auto}
+.status{display:flex;align-items:center;gap:8px;font-size:.72rem;color:var(--muted);margin-bottom:1.25rem;font-family:var(--ff-m)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.live{background:#2ed573;animation:pulse 2s infinite}.dot.err{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* FINALS BANNER */
+.finals{background:linear-gradient(135deg,var(--blue) 0%,#0d0f14 40%,var(--red) 100%);border:1px solid rgba(253,185,39,.3);border-radius:var(--radius);padding:1rem 1.5rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:16px}
+.finals-icon{font-size:2.2rem;flex-shrink:0}
+.finals h2{font-family:var(--ff-d);font-size:1.4rem;letter-spacing:3px;color:var(--gold)}
+.finals p{font-size:.75rem;color:rgba(255,255,255,.65);margin-top:2px}
+.series{margin-left:auto;text-align:right}
+.series-score{font-family:var(--ff-d);font-size:2.2rem;letter-spacing:4px}
+.series-label{font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:2px}
+
+/* GRID */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:1.1rem}
+
+/* CARD */
+.card{background:var(--s1);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:transform .2s,box-shadow .2s;animation:fadeUp .4s ease both}
+.card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.5)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* CARD HEAD */
+.card-head{padding:10px 14px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.tipoff{font-family:var(--ff-m);font-size:.68rem;color:var(--gold);letter-spacing:1px}
+.finals-badge{background:linear-gradient(135deg,var(--gold),#e8a400);color:#000;font-size:.58rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:4px}
+
+/* MATCHUP */
+.matchup{padding:14px 16px 10px;display:flex;align-items:center;gap:8px}
+.team-block{flex:1;display:flex;align-items:center;gap:10px}
+.team-block.home{flex-direction:row-reverse;text-align:right}
+.team-logo{width:52px;height:52px;object-fit:contain;flex-shrink:0;border-radius:6px;background:rgba(255,255,255,.04);padding:3px}
+.team-logo.err{opacity:.3;filter:grayscale(1)}
+.team-info{flex:1}
+.team-abbr{font-family:var(--ff-d);font-size:2rem;letter-spacing:1px;line-height:1}
+.team-name-sm{font-size:.6rem;color:var(--muted);margin-top:2px;line-height:1.3}
+.win-pct{font-family:var(--ff-m);font-size:.72rem;margin-top:5px}
+.win-pct.fav{color:#2ed573;font-weight:600}.win-pct.dog{color:var(--muted)}
+.vs-block{text-align:center;flex-shrink:0;width:44px}
+.vs-text{font-family:var(--ff-d);font-size:.9rem;color:var(--muted);letter-spacing:2px}
+.elo-nums{font-family:var(--ff-m);font-size:.58rem;color:var(--muted);margin-top:3px}
+
+/* PROB BAR */
+.prob-wrap{padding:0 14px 10px}
+.prob-bar{height:5px;border-radius:3px;overflow:hidden;background:var(--s2);display:flex}
+.prob-away{height:100%;background:var(--blue);transition:width .8s cubic-bezier(.22,.68,0,1.2)}
+.prob-home{height:100%;background:var(--red);flex:1}
+.prob-labels{display:flex;justify-content:space-between;font-size:.58rem;color:var(--muted);margin-top:3px;font-family:var(--ff-m)}
+
+/* STATS GRID */
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);border-top:1px solid var(--border)}
+.stat-sec{background:var(--s1);padding:10px 12px}
+.stat-title{font-family:var(--ff-d);font-size:.78rem;letter-spacing:2px;color:var(--muted);margin-bottom:8px}
+.stat-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.stat-lbl{font-size:.66rem;color:var(--muted)}
+.stat-val{font-family:var(--ff-m);font-size:.72rem;color:var(--text)}
+.stat-val.gold{color:var(--gold);font-weight:600}
+.stat-val.blue{color:#6baaff;font-weight:600}
+.stat-val.green{color:#2ed573;font-weight:600}
+
+/* WINNER STRIP */
+.winner-strip{padding:9px 14px;background:rgba(200,16,46,.07);border-top:1px solid rgba(200,16,46,.2);display:flex;justify-content:space-between;align-items:center}
+.winner-lbl{font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.winner-name{font-family:var(--ff-d);font-size:.95rem;color:var(--red);letter-spacing:1px}
+.h1-winner{font-family:var(--ff-d);font-size:.85rem;color:#6baaff;text-align:right}
+
+/* INJURY ACCORDION */
+.inj-toggle{width:100%;background:var(--s2);border:none;border-top:1px solid var(--border);padding:8px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;color:var(--text);font-family:var(--ff-b);font-size:.75rem;transition:background .15s}
+.inj-toggle:hover{background:var(--s3)}
+.inj-toggle .inj-label{display:flex;align-items:center;gap:6px}
+.inj-badge{background:rgba(255,107,107,.2);color:#ff6b6b;font-size:.6rem;padding:2px 6px;border-radius:4px;font-family:var(--ff-m)}
+.inj-badge.none{background:rgba(46,213,115,.15);color:#2ed573}
+.inj-arrow{font-size:.7rem;transition:transform .2s;color:var(--muted)}
+.inj-arrow.open{transform:rotate(180deg)}
+.inj-body{display:none;background:rgba(0,0,0,.3);border-top:1px solid var(--border);padding:10px 14px}
+.inj-body.open{display:block}
+.inj-team-label{font-size:.62rem;font-weight:600;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;margin-top:8px}
+.inj-team-label:first-child{margin-top:0}
+.inj-player{display:flex;align-items:baseline;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.inj-player:last-child{border-bottom:none}
+.inj-pname{font-size:.72rem;color:var(--text)}
+.inj-ppos{font-size:.6rem;color:var(--muted);margin-left:4px}
+.inj-status{font-family:var(--ff-m);font-size:.6rem;padding:1px 6px;border-radius:3px}
+.inj-out{background:rgba(200,16,46,.2);color:#ff6b6b}
+.inj-dtd{background:rgba(253,185,39,.15);color:var(--gold)}
+.inj-prob{background:rgba(107,170,255,.15);color:#6baaff}
+.inj-none-msg{font-size:.7rem;color:var(--muted);font-style:italic}
+
+/* SKELETON */
+.skeleton{background:linear-gradient(90deg,var(--s1) 25%,var(--s2) 50%,var(--s1) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:var(--radius);height:260px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+.empty{text-align:center;padding:4rem 2rem;color:var(--muted);grid-column:1/-1}
+.empty .ei{font-size:3rem;margin-bottom:.75rem}
+.empty h3{font-family:var(--ff-d);font-size:1.6rem;letter-spacing:2px;margin-bottom:.4rem;color:var(--text)}
+
+@media(max-width:768px){
+  header{flex-direction:column;gap:10px;padding:1rem}
+  .tabs{padding:1rem 1rem 0}
+  main{padding:1rem}
+  .grid{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr 1fr}
+  .finals{flex-wrap:wrap}.series{margin-left:0}
+}
 </style>
 </head>
 <body>
@@ -546,313 +146,248 @@
 <header>
   <div class="logo">
     <div class="logo-icon">🏀</div>
-    <div>
-      <h1>NBA ELO MODEL</h1>
-      <span>Prediction Engine · 2025–26 Season</span>
-    </div>
+    <div><h1>NBA PREDICTION MODEL</h1></div>
   </div>
   <div class="header-right">
-    <div class="api-input-wrap">
-      <label>Apps Script URL</label>
-      <input type="text" id="apiUrl" placeholder="Paste your deployed web app URL here…" />
-    </div>
-    <button class="btn-refresh" id="refreshBtn" onclick="loadData()">
-      <span>⟳</span> Refresh
-    </button>
+    <button class="btn" id="refreshBtn" onclick="loadData()">⟳ Refresh</button>
   </div>
 </header>
 
-<div class="tabs-bar">
-  <div class="tab active" id="tab-today" onclick="switchTab('today')">
-    TODAY <span class="tab-badge" id="badge-today">0</span>
-  </div>
-  <div class="tab" id="tab-tomorrow" onclick="switchTab('tomorrow')">
-    TOMORROW <span class="tab-badge" id="badge-tomorrow">0</span>
-  </div>
+<div class="tabs">
+  <div class="tab active" id="tab-today" onclick="switchTab('today')">TODAY <span class="badge" id="badge-today">0</span></div>
+  <div class="tab" id="tab-tomorrow" onclick="switchTab('tomorrow')">TOMORROW <span class="badge" id="badge-tomorrow">0</span></div>
 </div>
 
 <main>
-  <!-- NBA Finals Banner -->
-  <div class="finals-banner" id="finalsBanner" style="display:none">
-    <div class="icon">🏆</div>
-    <div>
-      <h2>NBA FINALS 2026</h2>
-      <p id="finalsMatchup">San Antonio Spurs vs New York Knicks</p>
-    </div>
-    <div class="finals-series">
-      <div class="series-score" id="seriesScore">0–0</div>
-      <div class="series-label">Series</div>
-    </div>
+  <div class="finals" id="finalsBanner" style="display:none">
+    <div class="finals-icon">🏆</div>
+    <div><h2>NBA FINALS 2026</h2><p id="finalsLine">San Antonio Spurs vs New York Knicks</p></div>
+    <div class="series"><div class="series-score" id="seriesScore">0–0</div><div class="series-label">Series</div></div>
   </div>
 
-  <div class="status-bar">
-    <div class="status-dot" id="statusDot"></div>
-    <span id="statusText">Enter your Apps Script URL and click Refresh to load predictions</span>
-  </div>
-
-  <div class="games-grid" id="gamesGrid">
-    <!-- cards injected here -->
-  </div>
+  <div class="status"><div class="dot" id="dot"></div><span id="statusTxt">Click Refresh to load today's predictions</span></div>
+  <div class="grid" id="gamesGrid"></div>
 </main>
 
 <script>
-// ── STATE ───────────────────────────────────────────────────
-let state = { today: [], tomorrow: [], activeTab: 'today', generated: null };
+var state = { today:[], tomorrow:[], tab:'today' };
 
-// ── SWITCH TAB ───────────────────────────────────────────────
-function switchTab(tab) {
-  state.activeTab = tab;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
+function switchTab(t) {
+  state.tab = t;
+  document.querySelectorAll('.tab').forEach(function(el){el.classList.remove('active');});
+  document.getElementById('tab-'+t).classList.add('active');
   renderGames();
 }
 
-// ── LOAD DATA ─────────────────────────────────────────────────
+function statusSet(type, msg) {
+  var dot = document.getElementById('dot');
+  dot.className = 'dot' + (type==='live'?' live':type==='err'?' err':'');
+  document.getElementById('statusTxt').textContent = msg;
+}
+
 async function loadData() {
-  const url = document.getElementById('apiUrl').value.trim();
-  const btn = document.getElementById('refreshBtn');
-  const dot = document.getElementById('statusDot');
-  const txt = document.getElementById('statusText');
+  var url = "https://script.google.com/macros/s/AKfycbznDVh5p36W7SIjxhWuaUnR6FZ-_Fmll4HczMHOF-BePUy4G1lCZa3oDTnJm3PmUFE/exec";
+  var btn = document.getElementById('refreshBtn');
+  if (!url) { loadDemo(); return; }
 
-  if (!url) {
-    // Load demo data if no URL
-    loadDemoData();
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = '⏳ Loading…';
-  dot.className = 'status-dot';
-  txt.textContent = 'Fetching from Google Sheets…';
-
-  // Show skeletons
-  const grid = document.getElementById('gamesGrid');
+  btn.disabled = true; btn.textContent = '⏳ Loading…';
+  statusSet('', 'Fetching from Google Sheets…');
+  var grid = document.getElementById('gamesGrid');
   grid.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton" style="animation-delay:.1s"></div>';
 
   try {
-    // JSONP-style request to bypass CORS
-    const cbName = 'nbaModelCb_' + Date.now();
-    const scriptTag = document.createElement('script');
-    scriptTag.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName;
-
-    const result = await new Promise((resolve, reject) => {
-      window[cbName] = function(data) {
-        delete window[cbName];
-        document.head.removeChild(scriptTag);
-        resolve(data);
-      };
-      scriptTag.onerror = () => reject(new Error('Network error — check your URL'));
-      document.head.appendChild(scriptTag);
-      setTimeout(() => reject(new Error('Request timed out after 15s')), 15000);
+    var cbName = 'nbaCb_' + Date.now();
+    var result = await new Promise(function(resolve, reject) {
+      var tag = document.createElement('script');
+      tag.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName;
+      window[cbName] = function(d) { delete window[cbName]; document.head.removeChild(tag); resolve(d); };
+      tag.onerror = function() { reject(new Error('Network error — check your URL')); };
+      document.head.appendChild(tag);
+      setTimeout(function(){ reject(new Error('Timed out after 15s')); }, 15000);
     });
-
-    state.today    = result.today    || [];
+    state.today = result.today || [];
     state.tomorrow = result.tomorrow || [];
-    state.generated = result.generated;
-
-    updateBadges();
-    renderGames();
-    showFinalsBanner();
-
-    dot.className = 'status-dot live';
-    txt.textContent = 'Live · Updated ' + new Date(result.generated).toLocaleTimeString();
-
-  } catch(err) {
-    dot.className = 'status-dot error';
-    txt.textContent = 'Error: ' + err.message;
-    grid.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><h3>CONNECTION FAILED</h3><p>${err.message}<br><br>Make sure your Apps Script is deployed as a Web App (Anyone can access).</p></div>`;
+    updateBadges(); renderGames(); showFinals();
+    statusSet('live', 'Live · Updated ' + new Date(result.generated).toLocaleTimeString());
+  } catch(e) {
+    statusSet('err', 'Error: ' + e.message);
+    grid.innerHTML = '<div class="empty"><div class="ei">⚠️</div><h3>Connection Failed</h3><p>'+e.message+'</p></div>';
   }
-
-  btn.disabled = false;
-  btn.innerHTML = '<span>⟳</span> Refresh';
+  btn.disabled = false; btn.innerHTML = '⟳ Refresh';
 }
 
-// ── DEMO DATA (NBA Finals 2026) ───────────────────────────────
-function loadDemoData() {
-  state.today = [
-    {
-      away: 'NYK', home: 'SAS',
-      awayName: 'New York Knicks', homeName: 'San Antonio Spurs',
-      tipoff: '8:30 PM ET',
-      awayWinPct: 37, homeWinPct: 63,
-      spread: 5.2, total: 226,
-      awayTotal: 110.4, homeTotal: 115.6,
-      h1AwayWin: 35, h1HomeWin: 65,
-      h1Total: 112, awayH1Tot: 54.4, homeH1Tot: 57.6,
-      winner: 'SAS', h1Winner: 'SAS',
-      awayElo: 1648, homeElo: 1756
-    }
-  ];
-  state.tomorrow = [
-    {
-      away: 'NYK', home: 'SAS',
-      awayName: 'New York Knicks', homeName: 'San Antonio Spurs',
-      tipoff: '8:30 PM ET',
-      awayWinPct: 37, homeWinPct: 63,
-      spread: 5.2, total: 226,
-      awayTotal: 110.4, homeTotal: 115.6,
-      h1AwayWin: 35, h1HomeWin: 65,
-      h1Total: 112, awayH1Tot: 54.4, homeH1Tot: 57.6,
-      winner: 'SAS', h1Winner: 'SAS',
-      awayElo: 1648, homeElo: 1756
-    }
-  ];
-  updateBadges();
-  renderGames();
-  showFinalsBanner();
-
-  const dot = document.getElementById('statusDot');
-  const txt = document.getElementById('statusText');
-  dot.className = 'status-dot live';
-  txt.textContent = 'Demo mode — paste your Apps Script URL to load live data';
+function loadDemo() {
+  state.today = [{
+    away:'NYK', home:'SAS', awayName:'New York Knicks', homeName:'San Antonio Spurs',
+    awayLogo:'https://a.espncdn.com/i/teamlogos/nba/500/nyk.png',
+    homeLogo:'https://a.espncdn.com/i/teamlogos/nba/500/sas.png',
+    tipoff:'8:30 PM ET',
+    awayWinPct:37, homeWinPct:63,
+    fgSpreadStr:'Home -5.2', h1SpreadStr:'Home -2.5',
+    total:226, awayTotal:110.4, homeTotal:115.6,
+    h1AwayWin:35, h1HomeWin:65,
+    h1Total:112, awayH1Tot:54.4, homeH1Tot:57.6,
+    winner:'SAS', h1Winner:'SAS',
+    awayElo:1588, homeElo:1654,
+    awayInjuries:[
+      {name:'Julius Randle',position:'PF',status:'Out',detail:'Left knee soreness'},
+      {name:'OG Anunoby',position:'SF',status:'Day-To-Day',detail:'Right elbow'},
+    ],
+    homeInjuries:[
+      {name:'Victor Wembanyama',position:'C',status:'Probable',detail:'Left ankle - listed as probable'},
+    ]
+  }];
+  state.tomorrow = [];
+  updateBadges(); renderGames(); showFinals();
+  statusSet('live', 'Demo mode — click Refresh to load live data');
 }
 
-// ── FINALS BANNER ─────────────────────────────────────────────
-function showFinalsBanner() {
-  // Show banner since NBA Finals is happening
-  const banner = document.getElementById('finalsBanner');
-  banner.style.display = 'flex';
-  document.getElementById('finalsMatchup').textContent = '🏀 San Antonio Spurs vs New York Knicks · 2026 NBA Finals';
-  document.getElementById('seriesScore').textContent = '0–0';
+function showFinals() {
+  var all = state.today.concat(state.tomorrow);
+  var finals = all.find(function(g){ return (g.away==='NYK'&&g.home==='SAS')||(g.away==='SAS'&&g.home==='NYK'); });
+  if (finals) {
+    document.getElementById('finalsBanner').style.display = 'flex';
+    document.getElementById('finalsLine').textContent = '🏀 ' + finals.awayName + ' @ ' + finals.homeName + ' · 2026 NBA Finals';
+  }
 }
 
-// ── UPDATE BADGES ─────────────────────────────────────────────
 function updateBadges() {
-  document.getElementById('badge-today').textContent    = state.today.length;
+  document.getElementById('badge-today').textContent = state.today.length;
   document.getElementById('badge-tomorrow').textContent = state.tomorrow.length;
 }
 
-// ── RENDER GAMES ──────────────────────────────────────────────
 function renderGames() {
-  const games = state.activeTab === 'today' ? state.today : state.tomorrow;
-  const grid  = document.getElementById('gamesGrid');
-
-  if (games.length === 0) {
-    grid.innerHTML = `
-      <div class="empty-state" style="grid-column:1/-1">
-        <div class="icon">🏀</div>
-        <h3>NO GAMES SCHEDULED</h3>
-        <p>No NBA games found for ${state.activeTab === 'today' ? "today" : "tomorrow"}.<br>Check back soon or try refreshing.</p>
-      </div>`;
+  var games = state.tab === 'today' ? state.today : state.tomorrow;
+  var grid = document.getElementById('gamesGrid');
+  if (!games.length) {
+    grid.innerHTML = '<div class="empty"><div class="ei">🏀</div><h3>No Games Scheduled</h3><p>No NBA games for '+(state.tab==='today'?'today':'tomorrow')+'.</p></div>';
     return;
   }
-
-  grid.innerHTML = games.map((g, i) => buildCard(g, i)).join('');
+  grid.innerHTML = games.map(function(g, i){ return buildCard(g, i); }).join('');
 }
 
-// ── BUILD CARD ────────────────────────────────────────────────
+function injStatusClass(status) {
+  var s = (status||'').toLowerCase();
+  if (s.includes('out')) return 'inj-out';
+  if (s.includes('day') || s.includes('dtd')) return 'inj-dtd';
+  return 'inj-prob';
+}
+
+function buildInjSection(g) {
+  var awayInj = g.awayInjuries || [];
+  var homeInj = g.homeInjuries || [];
+  var total = awayInj.length + homeInj.length;
+  var badgeCls = total > 0 ? '' : ' none';
+  var badgeTxt = total > 0 ? total + ' injured' : 'No injuries';
+
+  function playerRows(players) {
+    if (!players.length) return '<div class="inj-none-msg">None reported</div>';
+    return players.map(function(p){
+      return '<div class="inj-player">' +
+        '<span class="inj-pname">'+escHtml(p.name)+'<span class="inj-ppos">'+escHtml(p.position||'')+'</span></span>' +
+        '<span class="inj-status '+injStatusClass(p.status)+'">'+escHtml(p.status)+'</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  var uid = 'inj-' + g.away + '-' + g.home + '-' + Date.now();
+  return '<button class="inj-toggle" onclick="toggleInj(\''+uid+'\')">' +
+    '<span class="inj-label">🏥 Injury Report <span class="inj-badge'+badgeCls+'">'+badgeTxt+'</span></span>' +
+    '<span class="inj-arrow" id="arr-'+uid+'">▼</span>' +
+    '</button>' +
+    '<div class="inj-body" id="'+uid+'">' +
+      '<div class="inj-team-label">'+escHtml(g.awayName)+'</div>' + playerRows(awayInj) +
+      '<div class="inj-team-label" style="margin-top:10px">'+escHtml(g.homeName)+'</div>' + playerRows(homeInj) +
+    '</div>';
+}
+
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function toggleInj(uid) {
+  var body = document.getElementById(uid);
+  var arr  = document.getElementById('arr-'+uid);
+  var open = body.classList.toggle('open');
+  arr.classList.toggle('open', open);
+}
+
 function buildCard(g, idx) {
-  const homeFav   = g.homeWinPct >= 50;
-  const awayPct   = g.awayWinPct;
-  const homePct   = g.homeWinPct;
-  const spreadStr = Math.abs(g.spread) < 0.5
-    ? 'PICK \'EM'
-    : (g.spread > 0 ? g.homeName.split(' ').pop() : g.awayName.split(' ').pop()) + ' -' + Math.abs(g.spread).toFixed(1);
+  var homeFav = g.homeWinPct >= 50;
+  var isFinals = (g.away==='NYK'&&g.home==='SAS')||(g.away==='SAS'&&g.home==='NYK');
+  var finBadge = isFinals ? '<span class="finals-badge">🏆 NBA Finals</span>' : '';
 
-  const isFinals = (g.away === 'NYK' && g.home === 'SAS') || (g.away === 'SAS' && g.home === 'NYK');
-  const finalistBadge = isFinals ? `<span class="finalist-badge">🏆 NBA Finals</span>` : '';
+  function logoImg(src, abbr, side) {
+    return '<img class="team-logo" src="'+src+'" alt="'+abbr+'" ' +
+           'onerror="this.classList.add(\'err\');this.src=\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1 1%22/>\'" ' +
+           'loading="lazy">';
+  }
 
-  return `
-  <div class="game-card" style="animation-delay:${idx * 0.05}s">
-    <div class="card-head">
-      <span class="tipoff">⏱ ${g.tipoff || 'TBD'}</span>
-      ${finalistBadge}
-    </div>
+  var awayBlock = '<div class="team-block away">' +
+    logoImg(g.awayLogo, g.away, 'away') +
+    '<div class="team-info">' +
+      '<div class="team-abbr">'+g.away+'</div>' +
+      '<div class="team-name-sm">'+escHtml(g.awayName)+'</div>' +
+      '<div class="win-pct '+(homeFav?'dog':'fav')+'">'+g.awayWinPct+'% WIN</div>' +
+    '</div></div>';
 
-    <div class="matchup">
-      <div class="team-block away">
-        <div class="team-abbr">${g.away}</div>
-        <div class="team-name-full">${g.awayName}</div>
-        <div class="win-pct ${!homeFav ? 'fav' : 'dog'}">${awayPct}% WIN</div>
-      </div>
-      <div class="vs-block">
-        <div class="vs-text">@</div>
-        <div class="elo-diff">${g.awayElo} · ${g.homeElo}</div>
-      </div>
-      <div class="team-block home">
-        <div class="team-abbr">${g.home}</div>
-        <div class="team-name-full">${g.homeName}</div>
-        <div class="win-pct ${homeFav ? 'fav' : 'dog'}">${homePct}% WIN</div>
-      </div>
-    </div>
+  var homeBlock = '<div class="team-block home">' +
+    '<div class="team-info" style="text-align:right">' +
+      '<div class="team-abbr">'+g.home+'</div>' +
+      '<div class="team-name-sm">'+escHtml(g.homeName)+'</div>' +
+      '<div class="win-pct '+(homeFav?'fav':'dog')+'">'+g.homeWinPct+'% WIN</div>' +
+    '</div>' +
+    logoImg(g.homeLogo, g.home, 'home') +
+  '</div>';
 
-    <div class="prob-bar-wrap">
-      <div class="prob-bar">
-        <div class="prob-bar-away" style="width:${awayPct}%"></div>
-        <div class="prob-bar-home"></div>
-      </div>
-      <div class="prob-labels">
-        <span>${g.away} ${awayPct}%</span>
-        <span>${homePct}% ${g.home}</span>
-      </div>
-    </div>
+  return '<div class="card" style="animation-delay:'+(idx*.05)+'s">' +
 
-    <div class="stats-grid">
-      <div class="stat-section">
-        <div class="stat-section-title">Full Game</div>
-        <div class="stat-row">
-          <span class="stat-label">Spread</span>
-          <span class="stat-value highlight">${spreadStr}</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">Total O/U</span>
-          <span class="stat-value">${g.total}</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">${g.away} Proj.</span>
-          <span class="stat-value">${g.awayTotal}</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">${g.home} Proj.</span>
-          <span class="stat-value">${g.homeTotal}</span>
-        </div>
-      </div>
+    '<div class="card-head">' +
+      '<span class="tipoff">⏱ '+(g.tipoff||'TBD')+'</span>' + finBadge +
+    '</div>' +
 
-      <div class="stat-section">
-        <div class="stat-section-title">First Half</div>
-        <div class="stat-row">
-          <span class="stat-label">${g.away} Win %</span>
-          <span class="stat-value">${g.h1AwayWin}%</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">${g.home} Win %</span>
-          <span class="stat-value">${g.h1HomeWin}%</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">H1 Total</span>
-          <span class="stat-value highlight">${g.h1Total}</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">${g.away}/${g.home}</span>
-          <span class="stat-value">${g.awayH1Tot} / ${g.homeH1Tot}</span>
-        </div>
-      </div>
-    </div>
+    '<div class="matchup">' + awayBlock +
+      '<div class="vs-block"><div class="vs-text">@</div><div class="elo-nums">'+g.awayElo+' · '+g.homeElo+'</div></div>' +
+    homeBlock + '</div>' +
 
-    <div class="winner-strip">
-      <div>
-        <div class="winner-label">Predicted Winner</div>
-        <div class="winner-name">${g.winner}</div>
-      </div>
-      <div>
-        <div class="winner-label" style="text-align:right">1H Winner</div>
-        <div class="h1-winner-name">${g.h1Winner}</div>
-      </div>
-    </div>
-  </div>`;
+    '<div class="prob-wrap">' +
+      '<div class="prob-bar"><div class="prob-away" style="width:'+g.awayWinPct+'%"></div><div class="prob-home"></div></div>' +
+      '<div class="prob-labels"><span>'+g.away+' '+g.awayWinPct+'%</span><span>'+g.homeWinPct+'% '+g.home+'</span></div>' +
+    '</div>' +
+
+    '<div class="stats">' +
+      '<div class="stat-sec">' +
+        '<div class="stat-title">Full Game</div>' +
+        '<div class="stat-row"><span class="stat-lbl">Spread</span><span class="stat-val green">'+(g.fgSpreadStr||'—')+'</span></div>' +
+        '<div class="stat-row"><span class="stat-lbl">Total O/U</span><span class="stat-val gold">'+g.total+'</span></div>' +
+        '<div class="stat-row"><span class="stat-lbl">'+g.away+' proj</span><span class="stat-val">'+g.awayTotal+'</span></div>' +
+        '<div class="stat-row"><span class="stat-lbl">'+g.home+' proj</span><span class="stat-val">'+g.homeTotal+'</span></div>' +
+      '</div>' +
+      '<div class="stat-sec">' +
+        '<div class="stat-title">First Half</div>' +
+        '<div class="stat-row"><span class="stat-lbl">H1 Spread</span><span class="stat-val blue">'+(g.h1SpreadStr||'—')+'</span></div>' +
+        '<div class="stat-row"><span class="stat-lbl">H1 Total</span><span class="stat-val gold">'+g.h1Total+'</span></div>' +
+        '<div class="stat-row"><span class="stat-lbl">'+g.away+' proj</span><span class="stat-val">'+g.awayH1Tot+'</span></div>' +
+        '<div class="stat-row"><span class="stat-lbl">'+g.home+' proj</span><span class="stat-val">'+g.homeH1Tot+'</span></div>' +
+      '</div>' +
+      '<div class="stat-sec">' +
+        '<div class="stat-title">Win Prob</div>' +
+        '<div class="stat-row"><span class="stat-lbl">'+g.away+' FG</span><span class="stat-val">'+g.awayWinPct+'%</span></div>' +
+        '<div class="stat-row"><span class="stat-lbl">'+g.home+' FG</span><span class="stat-val">'+g.homeWinPct+'%</span></div>' +
+        '<div class="stat-row"><span class="stat-lbl">'+g.away+' H1</span><span class="stat-val">'+g.h1AwayWin+'%</span></div>' +
+        '<div class="stat-row"><span class="stat-lbl">'+g.home+' H1</span><span class="stat-val">'+g.h1HomeWin+'%</span></div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="winner-strip">' +
+      '<div><div class="winner-lbl">FG Winner</div><div class="winner-name">'+g.winner+'</div></div>' +
+      '<div><div class="winner-lbl" style="text-align:right">H1 Winner</div><div class="h1-winner">'+g.h1Winner+'</div></div>' +
+    '</div>' +
+
+    buildInjSection(g) +
+  '</div>';
 }
 
-// ── INIT ──────────────────────────────────────────────────────
 window.addEventListener('load', function() {
-  const saved = localStorage.getItem('nba_elo_url');
-  if (saved) document.getElementById('apiUrl').value = saved;
-
-  document.getElementById('apiUrl').addEventListener('change', function() {
-    localStorage.setItem('nba_elo_url', this.value);
-  });
-
-  // Load demo on startup to show the layout
-  loadDemoData();
+  loadData();
 });
 </script>
 </body>
