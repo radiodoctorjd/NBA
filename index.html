@@ -162,7 +162,7 @@ main{padding:1.5rem 2rem;max-width:1440px;margin:0 auto}
   <div class="finals" id="finalsBanner" style="display:none">
     <div class="finals-icon">🏆</div>
     <div><h2>NBA FINALS 2026</h2><p id="finalsLine">San Antonio Spurs vs New York Knicks</p></div>
-    <div class="series"><div class="series-score" id="seriesScore">0–0</div><div class="series-label">Series</div></div>
+    <div class="series"><div class="series-score" id="seriesScore">1–0</div><div class="series-label" id="seriesLabel">NYK leads series</div></div>
   </div>
 
   <div class="status"><div class="dot" id="dot"></div><span id="statusTxt">Click Refresh to load today's predictions</span></div>
@@ -245,10 +245,58 @@ function loadDemo() {
 function showFinals() {
   var all = state.today.concat(state.tomorrow);
   var finals = all.find(function(g){ return (g.away==='NYK'&&g.home==='SAS')||(g.away==='SAS'&&g.home==='NYK'); });
+
+  // Always show the Finals banner during the Finals, even on off days
+  document.getElementById('finalsBanner').style.display = 'flex';
+
   if (finals) {
-    document.getElementById('finalsBanner').style.display = 'flex';
     document.getElementById('finalsLine').textContent = '🏀 ' + finals.awayName + ' @ ' + finals.homeName + ' · 2026 NBA Finals';
+  } else {
+    document.getElementById('finalsLine').textContent = '🏀 New York Knicks vs San Antonio Spurs · 2026 NBA Finals';
   }
+
+  // Fetch live series record from ESPN playoff series API
+  fetchSeriesRecord();
+}
+
+function fetchSeriesRecord() {
+  // ESPN series API — pulls the active Finals series record live
+  var url = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/series?season=2026&seasontype=3';
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var series = (data.series || []).find(function(s) {
+        var teams = (s.competitors || []).map(function(c) { return (c.team && c.team.abbreviation) || ''; });
+        return (teams.indexOf('NYK') > -1 && teams.indexOf('SAS') > -1);
+      });
+      if (!series) {
+        // Fallback: try looking in a different structure
+        series = (data.events || []).find(function(s) {
+          var str = JSON.stringify(s);
+          return str.indexOf('NYK') > -1 && str.indexOf('SAS') > -1;
+        });
+      }
+      if (series) {
+        var comps = series.competitors || [];
+        var nyk = comps.find(function(c) { return c.team && c.team.abbreviation === 'NYK'; });
+        var sas = comps.find(function(c) { return c.team && c.team.abbreviation === 'SAS'; });
+        if (nyk && sas) {
+          var nykW = nyk.wins || 0;
+          var sasW = sas.wins || 0;
+          document.getElementById('seriesScore').textContent = nykW + '–' + sasW;
+          var leader = nykW > sasW ? 'NYK' : (sasW > nykW ? 'SAS' : 'Tied');
+          document.getElementById('seriesLabel').textContent = leader === 'Tied' ? 'Series Tied' : leader + ' leads series';
+          return;
+        }
+      }
+      // If API fails, fall back to known current state
+      document.getElementById('seriesScore').textContent = '1–0';
+      document.getElementById('seriesLabel').textContent = 'NYK leads series';
+    })
+    .catch(function() {
+      document.getElementById('seriesScore').textContent = '1–0';
+      document.getElementById('seriesLabel').textContent = 'NYK leads series';
+    });
 }
 
 function updateBadges() {
