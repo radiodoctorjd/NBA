@@ -259,45 +259,75 @@ function showFinals() {
 }
 
 function fetchSeriesRecord() {
-  // Fetch each Finals game date scoreboard and tally wins — fully dynamic, no hardcoding
   var finalsDates = ['20260603','20260605','20260608','20260610','20260613','20260616','20260619'];
 
   function applyResult(nykW, sasW) {
     document.getElementById('seriesScore').textContent = nykW + '–' + sasW;
-    if (nykW === sasW) {
-      document.getElementById('seriesLabel').textContent = 'Series Tied';
-    } else {
-      document.getElementById('seriesLabel').textContent = (nykW > sasW ? 'NYK' : 'SAS') + ' leads series';
-    }
+    document.getElementById('seriesLabel').textContent =
+      nykW === sasW ? 'Series Tied' : (nykW > sasW ? 'NYK' : 'SAS') + ' leads series';
   }
 
+  function showDebug(msg) {
+    document.getElementById('seriesLabel').textContent = msg;
+    console.log('[Finals]', msg);
+  }
+
+  showDebug('Fetching…');
+
   var promises = finalsDates.map(function(d) {
-    return fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=' + d + '&seasontype=3')
-      .then(function(r) { return r.json(); })
-      .catch(function() { return null; });
+    var url = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=' + d + '&seasontype=3';
+    return fetch(url)
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + d);
+        return r.json();
+      })
+      .then(function(data) {
+        console.log('[Finals] date=' + d + ' events=' + (data.events||[]).length);
+        return data;
+      })
+      .catch(function(e) {
+        console.warn('[Finals] fetch failed for ' + d + ':', e.message);
+        return null;
+      });
   });
 
   Promise.all(promises).then(function(results) {
     var nykW = 0, sasW = 0, gotData = false;
-    results.forEach(function(data) {
+    var gamesChecked = 0, gamesMatched = 0;
+
+    results.forEach(function(data, i) {
       if (!data) return;
       (data.events || []).forEach(function(ev) {
         var comp0 = ev.competitions && ev.competitions[0];
         if (!comp0) return;
-        if (!comp0.status || !comp0.status.type || !comp0.status.type.completed) return;
+        gamesChecked++;
         var comps = comp0.competitors || [];
         var abbrs = comps.map(function(c) { return (c.team && c.team.abbreviation) || ''; });
+        var completed = comp0.status && comp0.status.type && comp0.status.type.completed;
+        console.log('[Finals] date=' + finalsDates[i] + ' teams=' + abbrs.join('v') + ' completed=' + completed);
+        if (!completed) return;
         if (abbrs.indexOf('NYK') === -1 || abbrs.indexOf('SAS') === -1) return;
+        gamesMatched++;
         var winner = comps.find(function(c) { return c.winner === true; });
-        if (!winner) return;
+        if (!winner) { console.warn('[Finals] no winner flag on completed game'); return; }
         var wa = (winner.team && winner.team.abbreviation) || '';
+        console.log('[Finals] winner=' + wa);
         if (wa === 'NYK') { nykW++; gotData = true; }
         if (wa === 'SAS') { sasW++; gotData = true; }
       });
     });
-    if (gotData) applyResult(nykW, sasW);
-    // If API returned nothing, leave "Loading..." displayed
-  }).catch(function() { /* silent fail */ });
+
+    console.log('[Finals] gamesChecked=' + gamesChecked + ' gamesMatched=' + gamesMatched + ' NYK=' + nykW + ' SAS=' + sasW);
+
+    if (gotData) {
+      applyResult(nykW, sasW);
+    } else {
+      showDebug('API: no data (check console)');
+    }
+  }).catch(function(e) {
+    showDebug('Error: ' + e.message);
+    console.error('[Finals] Promise.all error:', e);
+  });
 }
 
 function updateBadges() {
