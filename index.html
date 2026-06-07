@@ -259,42 +259,114 @@ function showFinals() {
 }
 
 function fetchSeriesRecord() {
-  // ESPN series API — pulls the active Finals series record live
-  var url = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/series?season=2026&seasontype=3';
+  // Use ESPN's playoff bracket endpoint which has a reliable structure
+  var urls = [
+    'https://site.api.espn.com/apis/v2/sports/basketball/nba/playoff?year=2026',
+    'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/playoffs?season=2026'
+  ];
+
+  function applyResult(nykW, sasW) {
+    document.getElementById('seriesScore').textContent = nykW + '–' + sasW;
+    var leader = nykW > sasW ? 'NYK' : (sasW > nykW ? 'SAS' : 'Tied');
+    document.getElementById('seriesLabel').textContent = leader === 'Tied' ? 'Series Tied' : leader + ' leads series';
+  }
+
+  function searchForSeries(data) {
+    // Walk all nested arrays/objects looking for a series with both NYK and SAS
+    var str = JSON.stringify(data);
+    if (str.indexOf('NYK') === -1 || str.indexOf('SAS') === -1) return false;
+
+    function walk(obj) {
+      if (!obj || typeof obj !== 'object') return null;
+      // Check if this node looks like a series with competitors
+      var comps = obj.competitors || obj.teams || obj.participants || [];
+      if (comps.length >= 2) {
+        var abbrs = comps.map(function(c) {
+          return (c.team && c.team.abbreviation) || c.abbreviation || c.abbrev || '';
+        });
+        var hasNYK = abbrs.some(function(a){ return a.toUpperCase() === 'NYK'; });
+        var hasSAS = abbrs.some(function(a){ return a.toUpperCase() === 'SAS'; });
+        if (hasNYK && hasSAS) {
+          var nyk = comps.find(function(c){
+            var a = (c.team && c.team.abbreviation) || c.abbreviation || c.abbrev || '';
+            return a.toUpperCase() === 'NYK';
+          });
+          var sas = comps.find(function(c){
+            var a = (c.team && c.team.abbreviation) || c.abbreviation || c.abbrev || '';
+            return a.toUpperCase() === 'SAS';
+          });
+          var nykW = parseInt(nyk.wins || nyk.seriesWins || 0, 10);
+          var sasW = parseInt(sas.wins || sas.seriesWins || 0, 10);
+          return { nykW: nykW, sasW: sasW };
+        }
+      }
+      // Recurse into arrays and object values
+      if (Array.isArray(obj)) {
+        for (var i = 0; i < obj.length; i++) {
+          var r = walk(obj[i]);
+          if (r) return r;
+        }
+      } else {
+        var keys = Object.keys(obj);
+        for (var k = 0; k < keys.length; k++) {
+          var rv = walk(obj[keys[k]]);
+          if (rv) return rv;
+        }
+      }
+      return null;
+    }
+    return walk(data);
+  }
+
+  // Try each URL in sequence, fall back to scoreboard parsing
+  fetch(urls[0])
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var found = searchForSeries(data);
+      if (found) { applyResult(found.nykW, found.sasW); return; }
+      return fetch(urls[1]).then(function(r){ return r.json(); });
+    })
+    .then(function(data) {
+      if (!data) return;
+      var found = searchForSeries(data);
+      if (found) { applyResult(found.nykW, found.sasW); return; }
+      // Final fallback: scrape wins from recent scoreboard
+      return fetchSeriesFromScoreboard();
+    })
+    .catch(function() {
+      fetchSeriesFromScoreboard();
+    });
+}
+
+function fetchSeriesFromScoreboard() {
+  // Pull recent playoff games from scoreboard and tally wins manually
+  var url = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?seasontype=3&limit=100';
   fetch(url)
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      var series = (data.series || []).find(function(s) {
-        var teams = (s.competitors || []).map(function(c) { return (c.team && c.team.abbreviation) || ''; });
-        return (teams.indexOf('NYK') > -1 && teams.indexOf('SAS') > -1);
+      var events = data.events || [];
+      var nykW = 0, sasW = 0;
+      events.forEach(function(ev) {
+        var comps = ev.competitions && ev.competitions[0] && ev.competitions[0].competitors || [];
+        var abbrs = comps.map(function(c){ return (c.team && c.team.abbreviation)||''; });
+        if (abbrs.indexOf('NYK') === -1 || abbrs.indexOf('SAS') === -1) return;
+        var status = ev.status && ev.status.type && ev.status.type.completed;
+        if (!status) return;
+        var winner = comps.find(function(c){ return c.winner; });
+        if (!winner) return;
+        var wa = (winner.team && winner.team.abbreviation) || '';
+        if (wa === 'NYK') nykW++;
+        else if (wa === 'SAS') sasW++;
       });
-      if (!series) {
-        // Fallback: try looking in a different structure
-        series = (data.events || []).find(function(s) {
-          var str = JSON.stringify(s);
-          return str.indexOf('NYK') > -1 && str.indexOf('SAS') > -1;
-        });
+      if (nykW + sasW > 0) {
+        document.getElementById('seriesScore').textContent = nykW + '–' + sasW;
+        var leader = nykW > sasW ? 'NYK' : (sasW > nykW ? 'SAS' : 'Tied');
+        document.getElementById('seriesLabel').textContent = leader === 'Tied' ? 'Series Tied' : leader + ' leads series';
       }
-      if (series) {
-        var comps = series.competitors || [];
-        var nyk = comps.find(function(c) { return c.team && c.team.abbreviation === 'NYK'; });
-        var sas = comps.find(function(c) { return c.team && c.team.abbreviation === 'SAS'; });
-        if (nyk && sas) {
-          var nykW = nyk.wins || 0;
-          var sasW = sas.wins || 0;
-          document.getElementById('seriesScore').textContent = nykW + '–' + sasW;
-          var leader = nykW > sasW ? 'NYK' : (sasW > nykW ? 'SAS' : 'Tied');
-          document.getElementById('seriesLabel').textContent = leader === 'Tied' ? 'Series Tied' : leader + ' leads series';
-          return;
-        }
-      }
-      // If API fails, fall back to known current state
-      document.getElementById('seriesScore').textContent = '1–0';
-      document.getElementById('seriesLabel').textContent = 'NYK leads series';
+      // If still nothing found, leave whatever is already shown
     })
     .catch(function() {
-      document.getElementById('seriesScore').textContent = '1–0';
-      document.getElementById('seriesLabel').textContent = 'NYK leads series';
+      // Silent fail — hardcoded value already in the HTML as last resort
     });
 }
 
