@@ -267,6 +267,36 @@ function fetchSeriesRecord() {
       nykW === sasW ? 'Series Tied' : (nykW > sasW ? 'NYK' : 'SAS') + ' leads series';
   }
 
+  var promises = finalsDates.map(function(d) {
+    return fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=' + d + '&seasontype=3')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .catch(function() { return null; });
+  });
+
+  Promise.all(promises).then(function(results) {
+    var nykW = 0, sasW = 0, gotData = false;
+    results.forEach(function(data) {
+      if (!data) return;
+      (data.events || []).forEach(function(ev) {
+        var comp0 = ev.competitions && ev.competitions[0];
+        if (!comp0) return;
+        if (!comp0.status || !comp0.status.type || !comp0.status.type.completed) return;
+        var comps = comp0.competitors || [];
+        var abbrs = comps.map(function(c) { return (c.team && c.team.abbreviation) || ''; });
+        var hasNY = abbrs.some(function(a) { return a === 'NYK' || a === 'NY'; });
+        var hasSA = abbrs.some(function(a) { return a === 'SAS' || a === 'SA'; });
+        if (!hasNY || !hasSA) return;
+        var winner = comps.find(function(c) { return c.winner === true; });
+        if (!winner) return;
+        var wa = (winner.team && winner.team.abbreviation) || '';
+        if (wa === 'NYK' || wa === 'NY') { nykW++; gotData = true; }
+        if (wa === 'SAS' || wa === 'SA') { sasW++; gotData = true; }
+      });
+    });
+    if (gotData) applyResult(nykW, sasW);
+  }).catch(function() {});
+}
+
   function showDebug(msg) {
     document.getElementById('seriesLabel').textContent = msg;
     console.log('[Finals]', msg);
