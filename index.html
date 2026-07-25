@@ -208,6 +208,35 @@
   .sort-btn.active{background:rgba(255,107,53,.1);color:var(--orange);border-color:rgba(255,107,53,.25);}
   .sort-btn:hover:not(.active){color:var(--text);border-color:var(--border2);}
 
+  /* STANDINGS */
+  .standings-group{margin-bottom:32px;}
+  .standings-group:last-child{margin-bottom:0;}
+  .standings-group-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;letter-spacing:.03em;color:var(--text);padding:10px 4px;border-bottom:2px solid var(--orange);margin-bottom:2px;}
+  .standings-table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+  .standings-table th{font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);text-align:center;padding:10px 8px;background:var(--surface2);border-bottom:1px solid var(--border);}
+  .standings-table th:first-child,.standings-table th:nth-child(2){text-align:left;}
+  .standings-table td{padding:10px 8px;text-align:center;font-size:13px;border-bottom:1px solid var(--border);}
+  .standings-table tr:last-child td{border-bottom:none;}
+  .standings-table tr:hover td{background:rgba(255,255,255,0.02);}
+  .st-rank{font-family:'DM Mono',monospace;color:var(--text-dim);width:32px;}
+  .st-team{text-align:left;font-weight:600;display:flex;align-items:center;gap:8px;}
+  .st-team img{width:22px;height:22px;object-fit:contain;}
+  .st-team-name{white-space:nowrap;}
+  .st-clinch{font-size:10px;color:var(--teal);margin-left:4px;}
+  .st-record{font-family:'DM Mono',monospace;font-weight:600;}
+  .st-winpct{font-family:'DM Mono',monospace;color:var(--text-mid);}
+  .st-gb{font-family:'DM Mono',monospace;color:var(--text-mid);}
+  .st-gb.leader{color:var(--orange);font-weight:600;}
+  .st-streak-w{color:var(--teal);font-weight:600;font-family:'DM Mono',monospace;}
+  .st-streak-l{color:var(--red);font-weight:600;font-family:'DM Mono',monospace;}
+  .st-playoff-line td{border-bottom:2px dashed rgba(255,107,53,.3);}
+  @media(max-width:700px){
+    .standings-table{font-size:11px;}
+    .standings-table th,.standings-table td{padding:8px 4px;}
+    .st-team img{width:18px;height:18px;}
+    .standings-table .hide-mobile{display:none;}
+  }
+
   /* Enhanced ELO table new cols */
   .elo-table th.new-col{color:rgba(0,212,170,.7);}
   .pace-cell{font-family:'DM Mono',monospace;font-size:12px;color:#00b4d8;}
@@ -238,6 +267,7 @@
 <nav class="tab-bar">
   <button class="tab active" onclick="switchTab('today')">Today</button>
   <button class="tab" onclick="switchTab('tomorrow')">Tomorrow</button>
+  <button class="tab" onclick="switchTab('standings')">Standings</button>
   <button class="tab" onclick="switchTab('rankings')">ELO Rankings</button>
   <button class="tab" onclick="switchTab('teamstats')">Team Stats</button>
 </nav>
@@ -253,6 +283,17 @@
     <div class="section-title">Tomorrow's Games</div>
     <div class="section-subtitle" id="tomorrow-subtitle">Loading predictions...</div>
     <div id="tomorrow-games"><div class="loading-wrap"><div class="spinner"></div><div class="loading-text">Fetching live data from Google Sheets...</div></div></div>
+  </section>
+
+  <section class="section" id="tab-standings">
+    <div class="section-title">Standings</div>
+    <div class="section-subtitle" id="standings-subtitle">Loading standings...</div>
+    <div class="sort-bar">
+      <span class="sort-label">View:</span>
+      <button class="sort-btn active" onclick="setStandingsGrouping('conf')">By Conference</button>
+      <button class="sort-btn" onclick="setStandingsGrouping('div')">By Division</button>
+    </div>
+    <div id="standings-content"><div class="loading-wrap"><div class="spinner"></div><div class="loading-text">Fetching live standings from Google Sheets...</div></div></div>
   </section>
 
   <section class="section" id="tab-rankings">
@@ -617,6 +658,88 @@ function renderRankings(rankings) {
   });
 }
 
+// ── Standings ────────────────────────────────────────────────
+// Traditional W-L standings, grouped by conference or division (toggle),
+// with games-back computed against each group's leader using the standard
+// NBA formula. Same underlying data as ELO Rankings (data.eloRankings),
+// just grouped and sorted the traditional way instead of by ELO.
+function setStandingsGrouping(mode) {
+  _standingsGrouping = mode;
+  document.querySelectorAll('#tab-standings .sort-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderStandings(_standingsData, mode);
+}
+
+function renderStandings(rankings, grouping) {
+  if (!rankings || !rankings.length) {
+    document.getElementById('standings-content').innerHTML = '<div class="loading-wrap"><div class="loading-text">No standings data available.</div></div>';
+    return;
+  }
+
+  const groupKey = grouping === 'div' ? 'div' : 'conf';
+  const groups = {};
+  rankings.forEach(r => {
+    const key = r[groupKey] || 'Unknown';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(r);
+  });
+
+  // Conference order: East then West. Division order: standard NBA grouping.
+  const confOrder = ['East', 'West'];
+  const divOrder = ['Atlantic','Central','Southeast','Northwest','Pacific','Southwest'];
+  const orderedKeys = Object.keys(groups).sort((a, b) => {
+    const order = grouping === 'div' ? divOrder : confOrder;
+    const ai = order.indexOf(a), bi = order.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+
+  let html = '';
+  orderedKeys.forEach(key => {
+    const teams = groups[key].slice().sort((a, b) => {
+      const aPct = a.wins / Math.max(a.wins + a.losses, 1);
+      const bPct = b.wins / Math.max(b.wins + b.losses, 1);
+      return bPct - aPct;
+    });
+    const leader = teams[0];
+
+    html += `<div class="standings-group">
+      <div class="standings-group-title">${key}${grouping==='div' ? ' Division' : ' Conference'}</div>
+      <table class="standings-table">
+        <thead><tr>
+          <th>#</th><th>Team</th><th>W</th><th>L</th><th>Win%</th><th>GB</th>
+          <th class="hide-mobile">Home</th><th class="hide-mobile">Away</th><th class="hide-mobile">L10</th><th>Streak</th>
+        </tr></thead>
+        <tbody>`;
+
+    teams.forEach((t, i) => {
+      const winPct = t.wins / Math.max(t.wins + t.losses, 1);
+      const gb = i === 0 ? '-' : (((leader.wins - t.wins) + (t.losses - leader.losses)) / 2).toFixed(1);
+      const streakCls = (t.streak||'')[0] === 'W' ? 'st-streak-w' : (t.streak||'')[0] === 'L' ? 'st-streak-l' : '';
+      // Top 6 in a conference/division = playoff line marker (standard NBA cutoff before play-in)
+      const playoffLineCls = (grouping === 'conf' && i === 5) ? 'st-playoff-line' : '';
+      html += `<tr class="${playoffLineCls}">
+        <td class="st-rank">${i+1}</td>
+        <td class="st-team"><img src="${TEAM_LOGOS[t.abbr]||''}" alt="${t.abbr}" onerror="this.style.display='none'"><span class="st-team-name">${t.name||t.abbr}</span></td>
+        <td class="st-record">${t.wins}</td>
+        <td class="st-record">${t.losses}</td>
+        <td class="st-winpct">${(winPct*100).toFixed(1)}%</td>
+        <td class="st-gb ${i===0?'leader':''}">${gb}</td>
+        <td class="hide-mobile">${t.homeRec||'—'}</td>
+        <td class="hide-mobile">${t.roadRec||'—'}</td>
+        <td class="hide-mobile">${t.form||'—'}</td>
+        <td class="${streakCls}">${t.streak||'—'}</td>
+      </tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+  });
+
+  document.getElementById('standings-content').innerHTML = html;
+}
+
 // ── Error display ─────────────────────────────────────────────
 function showError(id, msg) {
   document.getElementById(id).innerHTML = `<div class="error-wrap"><div class="error-box"><div class="error-title">Unable to load data</div><div class="error-msg">${msg}</div><button class="retry-btn" onclick="init()">↻ Retry</button></div></div>`;
@@ -624,6 +747,7 @@ function showError(id, msg) {
 
 // ── Stored games for injury refresh ──────────────────────────
 let _todayGames = [], _tomorrowGames = [];
+let _standingsData = [], _standingsGrouping = 'conf';
 
 // ── Main init ─────────────────────────────────────────────────
 async function init() {
@@ -668,6 +792,12 @@ async function init() {
 
     renderDayGames(_todayGames,    'today-games',    'today-subtitle',    todayLabel);
     renderDayGames(_tomorrowGames, 'tomorrow-games', 'tomorrow-subtitle', tmrLabel);
+
+    // Standings
+    _standingsData = data.eloRankings;
+    document.getElementById('standings-subtitle').textContent =
+      '2026–27 Season · Updated through '+ts.toLocaleDateString('en-US',{month:'long',day:'numeric'})+' results';
+    renderStandings(_standingsData, _standingsGrouping);
 
     // Rankings
     document.getElementById('rankings-subtitle').textContent =
