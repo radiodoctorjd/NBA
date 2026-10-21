@@ -122,6 +122,33 @@
   .injury-name{font-size:13px;font-weight:500;flex:1;}
   .injury-detail{font-size:11px;color:var(--text-dim);}
   .no-injuries{font-size:12px;color:var(--text-dim);font-family:'DM Mono',monospace;padding:8px 0;}
+  .status-Probable{background:rgba(59,157,216,.15);color:#7cc4ee;}
+  .injury-team-label span{white-space:nowrap;}
+
+
+  /* PROJECTED LINEUPS */
+  .lineup-section{border-top:1px solid var(--border);background:var(--surface2);}
+  .lineup-header{padding:10px 20px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+  .lineup-dot{width:6px;height:6px;border-radius:50%;background:var(--teal);}
+  .lineup-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+  @media(max-width:640px){.lineup-grid{grid-template-columns:1fr;}.lineup-team-col{border-right:none!important;border-bottom:1px solid var(--border);}.lineup-team-col:last-child{border-bottom:none;}}
+  .lineup-team-col{padding:12px 20px;border-right:1px solid var(--border);min-width:0;}
+  .lineup-team-col:last-child{border-right:none;}
+  .lineup-team-label{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--text-mid);margin-bottom:8px;text-transform:uppercase;display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
+  .lu-pill{font-family:'DM Mono',monospace;font-size:10px;font-weight:600;padding:1px 6px;border-radius:3px;letter-spacing:0;text-transform:none;}
+  .lu-Confirmed{background:var(--teal-dim);color:var(--teal);}
+  .lu-Expected{background:rgba(255,209,102,.15);color:var(--yellow);}
+  .lu-Projected{background:rgba(255,255,255,.06);color:var(--text-mid);}
+  .lu-source{font-family:'DM Mono',monospace;font-size:10px;font-weight:400;color:var(--text-dim);letter-spacing:0;text-transform:none;}
+  .lu-player{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);}
+  .lu-player:last-of-type{border-bottom:none;}
+  .lu-pos{font-family:'DM Mono',monospace;font-size:10px;width:28px;flex-shrink:0;text-align:center;color:var(--text-mid);background:var(--surface3);border-radius:3px;padding:1px 0;}
+  .lu-name{font-size:13px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .lu-replaces{font-size:10px;color:var(--text-dim);font-family:'DM Mono',monospace;}
+  .lu-sub{font-size:12px;color:var(--text-mid);margin-top:8px;line-height:1.5;}
+  .lu-sub-label{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);margin-right:4px;}
+  .lu-out{color:#ff8fa3;}
+  .lu-empty{font-size:12px;color:var(--text-dim);font-family:'DM Mono',monospace;padding:8px 0;}
 
   /* ELO RANKINGS */
   .stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:2rem;}
@@ -387,12 +414,24 @@ function logoImg(abbr, size='64') {
 // ── Status badge ──────────────────────────────────────────────
 function statusClass(s) {
   if (!s) return 'status-Out';
-  const sl = s.toLowerCase();
-  if (sl.includes('out')) return 'status-Out';
+  const sl = String(s).toLowerCase();
   if (sl.includes('doubt')) return 'status-Doubtful';
-  if (sl.includes('question')) return 'status-Questionable';
+  if (sl.includes('prob')) return 'status-Probable';
+  if (sl.includes('question') || sl.includes('game time') || sl.includes('game-time') || sl.includes('gtd')) return 'status-Questionable';
   if (sl.includes('day')) return 'status-DTD';
-  return 'status-Out';
+  if (/\bout\b/.test(sl) || sl.includes('suspend') || sl.includes('inactive')) return 'status-Out';
+  return 'status-Questionable';
+}
+
+// Short badge text for a status ("Expected to be out until…" → "Out")
+function statusLabel(s) {
+  const c = statusClass(s);
+  return { 'status-Out':'Out', 'status-Doubtful':'Doubtful', 'status-Questionable':'Questionable',
+           'status-Probable':'Probable', 'status-DTD':'Day-To-Day' }[c] || (s || 'Out');
+}
+
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
 
 // ── Render injury column ──────────────────────────────────────
@@ -402,8 +441,8 @@ function statusClass(s) {
 // NOT recomputed during the live injury refresh, since scores/spread
 // on the card are fixed at initial load.
 function renderInjuryCol(abbr, name, players, eloDelta) {
-  const eloTag = (eloDelta && eloDelta !== 0)
-    ? `<span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:600;padding:1px 6px;border-radius:3px;background:rgba(239,71,111,.15);color:#ff8fa3;margin-left:6px;" title="ELO points deducted for injuries">${eloDelta} ELO</span>`
+  const eloTag = (eloDelta && Number(eloDelta) !== 0)
+    ? `<span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:600;padding:1px 6px;border-radius:3px;background:rgba(239,71,111,.15);color:#ff8fa3;margin-left:6px;" title="ELO points deducted for injuries">-${Math.abs(Number(eloDelta)).toFixed(1)} ELO</span>`
     : '';
   if (!players || players.length === 0) {
     return `<div class="injury-team-col">
@@ -417,10 +456,10 @@ function renderInjuryCol(abbr, name, players, eloDelta) {
     : '';
   const rows = players.map(p => `
     <div class="injury-player">
-      <span class="injury-status ${statusClass(p.status)}">${p.status}</span>
+      <span class="injury-status ${statusClass(p.status)}" title="${esc(p.status)}">${statusLabel(p.status)}</span>
       <div>
-        <div class="injury-name">${p.name}</div>
-        ${p.injury ? `<div class="injury-detail">${p.injury}</div>` : ''}
+        <div class="injury-name">${esc(p.name || p.player)}</div>
+        ${(p.injury || p.detail) ? `<div class="injury-detail">${esc(p.injury || p.detail)}</div>` : ''}
       </div>
     </div>`).join('');
   return `<div class="injury-team-col">
@@ -428,6 +467,55 @@ function renderInjuryCol(abbr, name, players, eloDelta) {
     ${rows}
   </div>`;
 }
+
+// ── Render projected lineups ──────────────────────────────────
+// lineup: { status: 'Confirmed'|'Expected'|'Projected', source, starters:[{name,pos,injuryStatus,replaces}],
+//           bench:[...], out:[...] }  — built by the Apps Script (Rotowire, else last starters + injuries)
+function renderLineupCol(name, lu) {
+  if (!lu || !lu.starters || !lu.starters.length) {
+    return `<div class="lineup-team-col">
+      <div class="lineup-team-label">${esc(name)}</div>
+      <div class="lu-empty">Lineup not available yet</div>
+    </div>`;
+  }
+  const tag = p => p.injuryStatus
+    ? `<span class="injury-status ${statusClass(p.injuryStatus)}" title="${esc(p.injuryStatus)}">${statusLabel(p.injuryStatus)}</span>` : '';
+  const starters = lu.starters.map(p => `
+      <div class="lu-player">
+        <span class="lu-pos">${esc(p.pos || '—')}</span>
+        <span class="lu-name" title="${esc(p.name)}">${esc(p.name)}${p.replaces ? ` <span class="lu-replaces">for ${esc(p.replaces)}</span>` : ''}</span>
+        ${tag(p)}
+      </div>`).join('');
+  const benchNames = (lu.bench || []).map(p => esc(p.name) + (p.injuryStatus ? ` <span style="color:var(--yellow)">(${statusLabel(p.injuryStatus).charAt(0)})</span>` : '')).join(', ');
+  const outNames = (lu.out || []).map(p => esc(p.name)).join(', ');
+  const src = lu.source ? `<span class="lu-source">${esc(lu.source)}</span>` : '';
+  return `<div class="lineup-team-col">
+    <div class="lineup-team-label">${esc(name)}<span class="lu-pill lu-${esc(lu.status)}">${esc(lu.status)}</span>${src}</div>
+    ${starters}
+    ${benchNames ? `<div class="lu-sub"><span class="lu-sub-label">Bench</span>${benchNames}</div>` : ''}
+    ${outNames ? `<div class="lu-sub lu-out"><span class="lu-sub-label">Out</span>${outNames}</div>` : ''}
+  </div>`;
+}
+
+function renderLineupSectionInner(g, awayLu, homeLu, liveTime) {
+  return `
+    <div class="lineup-header">
+      <div class="lineup-dot"></div>
+      Projected Lineups
+      ${liveTime ? `<span style="margin-left:auto;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim)">Live · ${liveTime}</span>` : ''}
+    </div>
+    <div class="lineup-grid">
+      ${renderLineupCol(g.awayName || g.away, awayLu)}
+      ${renderLineupCol(g.homeName || g.home, homeLu)}
+    </div>`;
+}
+
+// Game date (yyyyMMdd) + team → key used by the ?mode=lineups feed (yyyy-MM-dd|TEAM)
+function lineupKey(g, team) {
+  const d = String(g.date || '');
+  return (d.length === 8 ? `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6)}` : d) + '|' + team;
+}
+
 
 // ── Render game card ──────────────────────────────────────────
 // Build a quick lookup from eloRankings so game cards can show records
@@ -570,6 +658,8 @@ function renderGame(g, idx, awayInjuries, homeInjuries) {
       </div>
     </div>
   </div>
+
+  <div class="lineup-section">${renderLineupSectionInner(g, g.awayLineup, g.homeLineup)}</div>
 
   <div class="injury-section">
     <div class="injury-header">
@@ -831,7 +921,7 @@ async function refreshInjuries() {
   if (badge) badge.textContent = '⟳ Refreshing injuries...';
 
   try {
-    const injData = await fetchJSONP(WEBAPP_URL + '&mode=injuries');
+    const injData = await fetchJSONP(WEBAPP_URL + (WEBAPP_URL.includes('?') ? '&' : '?') + 'mode=injuries');
     const injuries = injData.injuries || {};
     const ts = new Date(injData.generated);
     const timeStr = ts.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
@@ -869,6 +959,28 @@ async function refreshInjuries() {
   } catch(e) {
     if (badge) badge.textContent = '';
     console.warn('Injury refresh failed:', e);
+  }
+  refreshLineups();
+}
+
+// ── Live lineup refresh ───────────────────────────────────────
+// Calls ?mode=lineups and re-renders just the Projected Lineups panels
+async function refreshLineups() {
+  try {
+    const luData = await fetchJSONP(WEBAPP_URL + (WEBAPP_URL.includes('?') ? '&' : '?') + 'mode=lineups');
+    const lineups = luData.lineups || {};
+    const timeStr = new Date(luData.generated).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    const allGames = [..._todayGames, ..._tomorrowGames];
+    document.querySelectorAll('.game-card').forEach((card, idx) => {
+      const g = allGames[idx];
+      const sec = card.querySelector('.lineup-section');
+      if (!g || !sec) return;
+      const awayLu = lineups[lineupKey(g, g.away)] || g.awayLineup;
+      const homeLu = lineups[lineupKey(g, g.home)] || g.homeLineup;
+      sec.innerHTML = renderLineupSectionInner(g, awayLu, homeLu, timeStr);
+    });
+  } catch(e) {
+    console.warn('Lineup refresh failed:', e);
   }
 }
 
