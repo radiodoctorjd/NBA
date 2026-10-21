@@ -19,11 +19,22 @@
   body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font-size:15px;line-height:1.5;min-height:100vh;}
 
   /* HEADER */
-  .site-header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100;}
+  .site-header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;min-height:64px;gap:12px;position:sticky;top:0;z-index:100;}
   .logo{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:22px;letter-spacing:.03em;color:var(--text);display:flex;align-items:center;gap:10px;}
   .logo-ball{width:28px;height:28px;background:var(--orange);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;}
   .logo span{color:var(--orange);}
-  .header-meta{font-size:12px;color:var(--text-dim);font-family:'DM Mono',monospace;}
+  .header-meta{font-size:12px;color:var(--text-dim);font-family:'DM Mono',monospace;text-align:right;line-height:1.5;}
+  .hm-item{white-space:nowrap;}
+  .hm-sep{color:var(--border2);margin:0 6px;}
+  .hm-time{color:var(--text-mid);}
+  .hm-stale .hm-time{color:var(--yellow);}
+  @media(max-width:640px){
+    .site-header{padding:10px 16px;flex-wrap:wrap;row-gap:6px;}
+    .logo{font-size:18px;}
+    .site-header > div:last-child{width:100%;justify-content:flex-start;gap:8px;}
+    .header-meta{font-size:10px;text-align:left;display:grid;grid-template-columns:auto auto;column-gap:14px;row-gap:0;}
+    .hm-sep{display:none;}
+  }
 
   /* TABS */
   .tab-bar{background:var(--surface);border-bottom:1px solid var(--border);display:flex;padding:0 2rem;}
@@ -390,6 +401,51 @@ const TEAM_LOGOS = {
 
 // ESPN team IDs no longer needed client-side — injuries fetched server-side in Apps Script
 
+// ── "Last updated" header ─────────────────────────────────────
+// Shows when the SHEET last refreshed each kind of data (sent by the Apps
+// Script as dataUpdated), not when this page was loaded.
+let _stamps = null, _pageLoaded = null;
+
+function fmtStamp(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  const t = d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  return d.toDateString() === new Date().toDateString() ? t : d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ', ' + t;
+}
+
+// Injuries/lineups refresh hourly 7 AM–last tip ET; flag them if they're >3h old during that window.
+function isStale(iso) {
+  if (!iso) return true;
+  const etHour = Number(new Date().toLocaleString('en-US',{timeZone:'America/New_York',hour:'numeric',hour12:false}));
+  return etHour >= 8 && etHour <= 23 && (Date.now() - new Date(iso).getTime()) > 3 * 3600 * 1000;
+}
+
+function renderHeaderStamps(fallbackGenerated) {
+  const el = document.getElementById('last-updated');
+  if (!el) return;
+  const loaded = _pageLoaded ? _pageLoaded.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+  if (!_stamps) {
+    // Older Apps Script deployment without update stamps
+    const ts = new Date(fallbackGenerated || Date.now());
+    el.textContent = 'Loaded: ' + ts.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' ' +
+      ts.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    return;
+  }
+  const items = [
+    ['Predictions', _stamps.predictions, false],
+    ['Scores', _stamps.scores, false],
+    ['Injuries', _stamps.injuries, isStale(_stamps.injuries)],
+    ['Lineups', _stamps.lineups, isStale(_stamps.lineups)],
+  ];
+  el.innerHTML = items.map(([label, iso, stale], i) =>
+    (i ? '<span class="hm-sep">·</span>' : '') +
+    `<span class="hm-item${stale ? ' hm-stale' : ''}" title="${label} last updated in the sheet: ${iso ? new Date(iso).toLocaleString('en-US') : 'never'}${stale ? ' (may be stale)' : ''}">${label} <span class="hm-time">${fmtStamp(iso)}</span></span>`
+  ).join('');
+  el.title = 'When the Google Sheet last refreshed each feed' + (_stamps.injuriesSource ? ` · injuries from ${_stamps.injuriesSource}` : '') + (loaded ? ` · page loaded ${loaded}` : '');
+}
+
+
 // ── JSONP fetch (for main data from Apps Script) ──────────────
 function fetchJSONP(url) {
   return new Promise((resolve, reject) => {
@@ -502,7 +558,7 @@ function renderLineupSectionInner(g, awayLu, homeLu, liveTime) {
     <div class="lineup-header">
       <div class="lineup-dot"></div>
       Projected Lineups
-      ${liveTime ? `<span style="margin-left:auto;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim)">Live · ${liveTime}</span>` : ''}
+      ${liveTime ? `<span style="margin-left:auto;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim)" title="When the sheet last refreshed lineups">Updated ${liveTime}</span>` : ''}
     </div>
     <div class="lineup-grid">
       ${renderLineupCol(g.awayName || g.away, awayLu)}
@@ -850,10 +906,11 @@ async function init() {
     const data = await fetchJSONP(WEBAPP_URL);
 
     // Timestamp
-    const ts = new Date(data.generated);
-    document.getElementById('last-updated').textContent =
-      'Updated: '+ts.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+
-      ' '+ts.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    _pageLoaded = new Date();
+    _stamps = data.dataUpdated || null;
+    renderHeaderStamps(data.generated);
+    // "Updated through …" subtitles follow the last score sync, not the page load
+    const ts = new Date((_stamps && _stamps.scores) || data.generated);
 
     _todayGames    = data.games.filter(g=>g.label==='Today');
     _tomorrowGames = data.games.filter(g=>g.label==='Tomorrow');
@@ -923,8 +980,9 @@ async function refreshInjuries() {
   try {
     const injData = await fetchJSONP(WEBAPP_URL + (WEBAPP_URL.includes('?') ? '&' : '?') + 'mode=injuries');
     const injuries = injData.injuries || {};
-    const ts = new Date(injData.generated);
-    const timeStr = ts.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    if (_stamps && injData.updated) { _stamps.injuries = injData.updated; if (injData.source) _stamps.injuriesSource = injData.source; renderHeaderStamps(); }
+    const timeStr = injData.updated ? fmtStamp(injData.updated)
+      : new Date(injData.generated).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
 
     // Patch every injury section currently in the DOM
     const allGames = [..._todayGames, ..._tomorrowGames];
@@ -947,7 +1005,7 @@ async function refreshInjuries() {
         <div class="injury-header">
           <div class="injury-dot"></div>
           Injury Report
-          <span style="margin-left:auto;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim)">Live · ${timeStr}</span>
+          <span style="margin-left:auto;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim)" title="When the sheet last pulled the injury report">Updated ${timeStr}</span>
         </div>
         <div class="injury-grid">
           ${renderInjuryCol(g.away, g.awayName, awayInj, g.awayInjuryElo)}
@@ -955,7 +1013,7 @@ async function refreshInjuries() {
         </div>`;
     });
 
-    if (badge) badge.textContent = 'Injuries live · ' + timeStr;
+    if (badge) badge.textContent = '';
   } catch(e) {
     if (badge) badge.textContent = '';
     console.warn('Injury refresh failed:', e);
@@ -969,7 +1027,9 @@ async function refreshLineups() {
   try {
     const luData = await fetchJSONP(WEBAPP_URL + (WEBAPP_URL.includes('?') ? '&' : '?') + 'mode=lineups');
     const lineups = luData.lineups || {};
-    const timeStr = new Date(luData.generated).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    if (_stamps && luData.updated) { _stamps.lineups = luData.updated; renderHeaderStamps(); }
+    const timeStr = luData.updated ? fmtStamp(luData.updated)
+      : new Date(luData.generated).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
     const allGames = [..._todayGames, ..._tomorrowGames];
     document.querySelectorAll('.game-card').forEach((card, idx) => {
       const g = allGames[idx];
