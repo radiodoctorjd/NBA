@@ -100,8 +100,9 @@ main{padding-block:18px 40px}
 .pts small{display:block;font-family:var(--body);font-size:10px;font-weight:600;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
 .bar{height:6px;border-radius:999px;background:var(--away);overflow:hidden;display:flex}
 .bar i{display:block;height:100%;background:var(--home);margin-left:auto}
-.lines{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;border-top:1px dashed var(--line);padding-top:8px;margin:0}
+.lines{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;border-top:1px dashed var(--line);padding-top:8px;margin:0}
 .lines div{min-width:0}
+@media (max-width:480px){.lines{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:8px}}
 .lines dt{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .lines dd{margin:0;font-weight:600;font-size:14px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .lines dd small{font-weight:500;color:var(--muted)}
@@ -471,7 +472,8 @@ function card(g){
     <dl class="lines">
       <div><dt>Model spread</dt><dd>${esc(favLine(g.spread, hFav ? g.home : g.away))}</dd></div>
       <div><dt>Model total</dt><dd>${f1(n(g.fullTotal))}</dd></div>
-      <div><dt>1st half</dt><dd>${esc(g.winner1H||"—")} <small>· ${f1(n(g.h1Total))}</small></dd></div>
+      <div><dt>1H spread</dt><dd>${esc(favLine(g.spread1H, h1Fav ? g.home : g.away))}</dd></div>
+      <div><dt>1H total</dt><dd>${f1(n(g.h1Total))}</dd></div>
     </dl>
     ${injChips.length?`<div class="leans">${injChips.join("")}</div>`:""}
     <details class="more"><summary>Matchup detail</summary>
@@ -483,7 +485,6 @@ function card(g){
         <span class="full">1st half</span>
         <span>1H pick</span><b>${esc(g.winner1H||"—")}${g.confidence1H?` · ${esc(g.confidence1H)}`:""}</b>
         <span>1H win% (away / home)</span><b>${esc(g.awayWinProb1H??"—")}% / ${esc(g.homeWinProb1H??"—")}%</b>
-        <span>1H spread</span><b>${esc(favLine(g.spread1H, h1Fav ? g.home : g.away))}</b>
         <span>1H projected</span><b>${f1(n(g.awayScore1H))} – ${f1(n(g.homeScore1H))}</b>
         <span>1H ELO (away / home)</span><b>${esc(g.awayH1Elo??"—")} / ${esc(g.homeH1Elo??"—")}</b>
       </div>
