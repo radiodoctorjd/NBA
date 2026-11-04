@@ -71,7 +71,8 @@ main{padding-block:18px 40px}
 .seg button[aria-pressed="true"]{background:var(--court-soft);color:var(--court)}
 .toggle{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--muted);cursor:pointer;user-select:none}
 .toggle input{accent-color:var(--court);width:16px;height:16px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;align-items:start}
+/* At most two columns: each card is at least half the row (or 330px on small screens) */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(max(330px,calc((100% - 16px) / 2)),1fr));gap:16px;align-items:start}
 @media (max-width:420px){.grid{grid-template-columns:1fr}}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px 10px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
