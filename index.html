@@ -83,9 +83,12 @@ main{padding-block:18px 40px}
 .pill.moderate{background:var(--warn-bg);color:var(--warn)}
 .pill.toss{background:var(--bad-bg);color:var(--bad)}
 .pill.b2b{background:var(--accent-soft);color:var(--accent);cursor:help}
-.teams{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px 12px;align-items:center}
+.teams{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px 12px;align-items:center}
 .tname{display:flex;align-items:center;gap:8px;min-width:0}
-.tname img{width:26px;height:26px;object-fit:contain;flex:none}
+.tname .team-id{display:flex;flex-direction:column;align-items:center;gap:3px;width:48px;flex:none}
+.team-id .abbr{font-family:var(--display);font-weight:700;font-size:18px;line-height:1;letter-spacing:.02em}
+.team-id img{display:block;width:30px;height:30px;object-fit:contain}
+td.team picture{display:inline}
 .tname .nm{min-width:0;display:flex;flex-direction:column}
 .tname .row1{display:flex;align-items:center;gap:6px;min-width:0}
 .tname strong{font-weight:600;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -250,7 +253,10 @@ const n = v => { if (v==null || v==="") return null; const x = Number(String(v).
 const f1 = x => x==null ? "—" : Number(x).toFixed(1);
 const minus = s => String(s).replace(/-/g,"−");
 const signed = x => x==null ? "—" : minus((x>0?"+":"") + Number(x).toFixed(1));
-const logo = (abbr, alt="") => TEAM_LOGOS[abbr] ? `<img src="${TEAM_LOGOS[abbr]}" alt="${esc(alt)}" loading="lazy" onerror="this.style.visibility='hidden'">` : "";
+// ESPN logo; in dark mode use ESPN's dark-background version, falling back to the regular logo, then hiding it.
+const logo = (abbr, alt="") => TEAM_LOGOS[abbr] ? `<picture><source srcset="${TEAM_LOGOS[abbr].replace('/500/','/500-dark/')}" media="(prefers-color-scheme: dark)"><img src="${TEAM_LOGOS[abbr]}" alt="${esc(alt)}" loading="lazy" onerror="var s=this.previousElementSibling;if(s){s.remove();}else{this.style.visibility='hidden';}"></picture>` : "";
+// Abbreviation with the logo centered underneath (same as the NHL page)
+const teamId = abbr => `<div class="team-id"><span class="abbr">${esc(abbr)}</span>${logo(abbr)}</div>`;
 function tipMinutes(s){ const m = String(s||"").match(/(\d{1,2}):(\d{2})\s*([AP]M)/i); if(!m) return 9999; let h=+m[1]%12; if(m[3].toUpperCase()==="PM") h+=12; return h*60 + +m[2]; }
 function dayLabel(off){ const d=new Date(); d.setDate(d.getDate()+off); return d.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}); }
 function wlClass(s){ const p=String(s||"").split("-").map(Number); return p.length<2||isNaN(p[0])||isNaN(p[1]) ? "" : p[0]>p[1] ? "pos" : p[0]<p[1] ? "neg" : ""; }
@@ -457,7 +463,7 @@ function card(g){
     return bits.join(" · ");
   };
   const team = (side, isPick, win, pts) => `
-      <div class="tname${isPick?" pick":""}">${logo(g[side], g[side])}<div class="nm"><div class="row1"><strong title="${esc(g[side+"Name"]||g[side])}">${esc(g[side+"Name"]||g[side])}</strong>${b2bSlot(g, side)}</div><div class="rec">${recLine(side)}</div></div></div>
+      <div class="tname${isPick?" pick":""}">${teamId(g[side])}<div class="nm"><div class="row1"><strong title="${esc(g[side+"Name"]||g[side])}">${esc(g[side+"Name"]||g[side])}</strong>${b2bSlot(g, side)}</div><div class="rec">${recLine(side)}</div></div></div>
       <div class="wp">${win.toFixed(0)}%</div>
       <div class="pts">${f1(n(pts))}<small>proj</small></div>`;
   const injChips = ["away","home"].filter(s => n(g[s+"InjuryElo"])).map(s => `<span class="lean" title="ELO points the model deducted for ${esc(g[s])} injuries">${esc(g[s])} injuries ${minus("-"+Math.abs(n(g[s+"InjuryElo"])).toFixed(1))} ELO</span>`);
