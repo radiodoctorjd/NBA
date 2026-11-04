@@ -287,6 +287,10 @@
   .team-rec-ats{font-family:'DM Mono',monospace;font-size:11px;color:var(--yellow);font-weight:500;}
 
   .footer{margin-top:4rem;padding:2rem;text-align:center;border-top:1px solid var(--border);font-size:11px;color:var(--text-dim);font-family:'DM Mono',monospace;}
+  @media (min-width:600px){ .team-abbr{white-space:nowrap;} }
+  .b2b-slot{display:inline-flex;vertical-align:middle;}
+  .b2b-badge{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.06em;line-height:1;padding:3px 6px;border-radius:3px;background:rgba(255,107,53,.15);color:var(--orange);margin-left:8px;cursor:help;}
+  @media (max-width:599px){ .b2b-slot{display:block;line-height:1;margin-top:4px;} .b2b-slot:empty{display:none;} .b2b-badge{display:inline-block;margin-left:0;} }
 </style>
 </head>
 <body>
@@ -634,11 +638,11 @@ function renderGame(g, idx, awayInjuries, homeInjuries) {
   <div class="matchup">
     <div class="team-block away">
       ${logoImg(g.away)}
-      <div class="team-abbr" style="color:${!hFav?'var(--orange)':'var(--text-mid)'}">${g.away}</div>
+      <div class="team-abbr" style="color:${!hFav?'var(--orange)':'var(--text-mid)'}">${g.away}${b2bSlot(g.away, g.label==='Tomorrow'?1:0, g.awayB2B)}</div>
       <div class="team-name-small">${g.awayName}</div>
       <div class="team-elo-tag">ELO ${g.awayElo}</div>
       ${teamRecordHTML(g.away, false)}
-      ${streakTagHTML(g.awayStreak, g.awayRestDays, g.awayB2B, g.awayFormIsFallback)}
+      ${streakTagHTML(g.awayStreak, g.awayRestDays, false, g.awayFormIsFallback)}
       <div class="team-win-pct ${!hFav?'fav':'dog'}">${g.awayWinProb}% <span style="font-size:11px;font-weight:400;color:var(--text-dim)">win prob</span></div>
     </div>
     <div class="vs-block">
@@ -648,11 +652,11 @@ function renderGame(g, idx, awayInjuries, homeInjuries) {
     </div>
     <div class="team-block home">
       ${logoImg(g.home)}
-      <div class="team-abbr" style="color:${hFav?'var(--orange)':'var(--text-mid)'}">${g.home}</div>
+      <div class="team-abbr" style="color:${hFav?'var(--orange)':'var(--text-mid)'}">${g.home}${b2bSlot(g.home, g.label==='Tomorrow'?1:0, g.homeB2B)}</div>
       <div class="team-name-small">${g.homeName} <span style="font-size:10px;color:var(--text-dim)">[Home]</span></div>
       <div class="team-elo-tag">ELO ${g.homeElo}</div>
       ${teamRecordHTML(g.home, true)}
-      ${streakTagHTML(g.homeStreak, g.homeRestDays, g.homeB2B, g.homeFormIsFallback)}
+      ${streakTagHTML(g.homeStreak, g.homeRestDays, false, g.homeFormIsFallback)}
       <div class="team-win-pct ${hFav?'fav':'dog'}">${g.homeWinProb}% <span style="font-size:11px;font-weight:400;color:var(--text-dim)">win prob</span></div>
     </div>
   </div>
@@ -895,6 +899,65 @@ function showError(id, msg) {
 let _todayGames = [], _tomorrowGames = [];
 let _standingsData = [], _standingsGrouping = 'conf';
 
+/* ── Back-to-back badges ─────────────────────────────────────────────
+   A team is on a back-to-back when it also played the calendar day
+   before this game. Game days come from the sheet's own schedule plus
+   ESPN's public scoreboard for yesterday and today (fetched straight
+   from the browser), so today's games can see last night's results.
+   Cards render an empty .b2b-slot next to each team; applyB2BBadges()
+   fills them whenever either data source arrives. */
+const B2B_ESPN_PATH = 'basketball/nba';
+// ESPN abbreviation -> abbreviation used by the sheet
+const B2B_ALIASES = { GS:'GSW', NO:'NOP', NY:'NYK', SAS:'SA', UTAH:'UTA', WSH:'WAS' };
+const _b2bPlayed = {};   // team abbr -> Set of 'YYYY-MM-DD' (local)
+
+function b2bKey(abbr){
+  const a = String(abbr || '').trim().toUpperCase();
+  return B2B_ALIASES[a] || a;
+}
+function b2bDay(offset){
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function b2bAddGame(abbr, day){
+  const k = b2bKey(abbr);
+  if (!k || !day) return;
+  (_b2bPlayed[k] = _b2bPlayed[k] || new Set()).add(day);
+}
+// offset: 0 = game is today, 1 = game is tomorrow
+function b2bSlot(abbr, offset, forced){
+  return `<span class="b2b-slot" data-team="${b2bKey(abbr)}" data-offset="${offset}"${forced ? ' data-forced="1"' : ''}></span>`;
+}
+function applyB2BBadges(){
+  document.querySelectorAll('.b2b-slot').forEach(slot => {
+    const team = slot.dataset.team;
+    const prevDay = b2bDay(Number(slot.dataset.offset || 0) - 1);
+    const onB2B = slot.dataset.forced === '1' || !!(_b2bPlayed[team] && _b2bPlayed[team].has(prevDay));
+    slot.innerHTML = onB2B
+      ? `<span class="b2b-badge" title="${team} is on a back-to-back (also played the previous day)">B2B</span>`
+      : '';
+  });
+}
+async function loadB2BFromESPN(){
+  await Promise.all([-1, 0].map(async offset => {
+    const day = b2bDay(offset);
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${B2B_ESPN_PATH}/scoreboard?dates=${day.replace(/-/g,'')}`, { signal: ctrl.signal, cache: 'no-store' });
+      clearTimeout(t);
+      if (!res.ok) return;
+      const data = await res.json();
+      (data.events || []).forEach(ev =>
+        ((ev.competitions && ev.competitions[0] && ev.competitions[0].competitors) || [])
+          .forEach(c => b2bAddGame(c.team && c.team.abbreviation, day)));
+    } catch (e) { /* offline / blocked: fall back to sheet data only */ }
+  }));
+  applyB2BBadges();
+}
+const _b2bReady = loadB2BFromESPN();
+
 // ── Main init ─────────────────────────────────────────────────
 async function init() {
   ['today-games','tomorrow-games'].forEach(id=>{
@@ -939,6 +1002,11 @@ async function init() {
 
     renderDayGames(_todayGames,    'today-games',    'today-subtitle',    todayLabel);
     renderDayGames(_tomorrowGames, 'tomorrow-games', 'tomorrow-subtitle', tmrLabel);
+
+    // Back-to-back: teams playing today are on a B2B tomorrow
+    [[_todayGames, 0], [_tomorrowGames, 1]].forEach(([games, off]) =>
+      games.forEach(g => { b2bAddGame(g.away, b2bDay(off)); b2bAddGame(g.home, b2bDay(off)); }));
+    applyB2BBadges();
 
     // Standings
     _standingsData = data.eloRankings;
