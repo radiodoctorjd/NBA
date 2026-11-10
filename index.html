@@ -691,7 +691,7 @@ async function loadAll(){
     refreshInjuries().then(refreshLineups);
   } catch(e) {
     S.err = e;
-    $("#notice").innerHTML = `<div class="notice err"><p>Couldn't load the model data: ${esc(e.message||e)}.</p><button class="btn" id="nb">Try again</button> <a href="${esc(modeUrl('status'))}" target="_blank" rel="noopener" style="margin-left:10px">Open the sheet's status page</a></div>`;
+    $("#notice").innerHTML = `<div class="notice err"><p>Couldn't load the model data: ${esc(e.message||e)}.</p><button class="btn" id="nb">Try again</button> <a href="${esc(modeUrl('status'))}" target="_blank" rel="noopener" style="margin-left:10px">Open the sheet's status page</a><p style="margin:10px 0 0;font-size:.9em;opacity:.85">Tip: open that status page in a <b>private / incognito window</b>. If Google asks you to sign in there, the web app's “Who has access” isn't set to “Anyone” — which is why it can work for you in a signed-in tab but not on this page. If it shows data there, a privacy setting or extension in this browser is blocking the page's request.</p></div>`;
     $("#nb").addEventListener("click", () => { $("#notice").innerHTML=""; loadAll(); });
     render();
   }
