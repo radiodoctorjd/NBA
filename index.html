@@ -618,16 +618,41 @@ function fetchJSONP(url){
     const timer = setTimeout(() => { cleanup(); reject(new Error('Timed out reaching the model sheet')); }, 15000);
     window[cb] = data => { cleanup(); resolve(typeof data==='string' ? JSON.parse(data) : data); };
     function cleanup(){ clearTimeout(timer); delete window[cb]; sc.parentNode && sc.parentNode.removeChild(sc); }
-    sc.onerror = () => { cleanup(); reject(new Error("Couldn't load the model sheet")); };
-    sc.src = url + (url.includes('?')?'&':'?') + 'callback=' + cb;
+    sc.onerror = () => { cleanup(); reject(new Error("Couldn't reach the model sheet — its web app didn't return data (usually a script error, a changed web-app address, or access not set to “Anyone”)")); };
+    sc.src = url + (url.includes('?')?'&':'?') + 'callback=' + cb + '&_=' + Date.now();   // _ = cache-buster
     document.head.appendChild(sc);
   });
 }
 const modeUrl = m => WEBAPP_URL + (WEBAPP_URL.includes('?')?'&':'?') + 'mode=' + m;
 
+// If the browser blocks the request under the page's Content Security Policy (typical when a page is shown
+// inside a preview/sandbox), it fires this event — record it so the error message can say so.
+const cspHits = [];
+document.addEventListener('securitypolicyviolation', e => { if (/google/i.test(e.blockedURI || '')) cspHits.push(e.effectiveDirective || e.violatedDirective || 'policy'); });
+const whereAmI = () => { let framed = false; try { framed = window.top !== window.self; } catch (_) { framed = true; } return (location.protocol === 'file:' ? 'a local file' : location.protocol + '//' + location.host) + (framed ? ' (inside a frame)' : ''); };
+
+// JSONP first (works from any page); if the script tag is blocked or fails, try fetch() — a different route
+// that gets past script-specific blockers (MIME checks, some extensions).
+async function loadModel(url){
+  try { return await fetchJSONP(url); }
+  catch (e1) {
+    let why2 = '';
+    try {
+      const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 12000);
+      const r = await fetch(url + (url.includes('?')?'&':'?') + '_=' + Date.now(), { redirect: 'follow', signal: ctrl.signal });
+      clearTimeout(t);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.json();
+    } catch (e2) { why2 = (e2 && e2.name === 'AbortError') ? 'timed out' : (e2.message || String(e2)); }
+    const csp = cspHits.length ? ` This page's Content Security Policy blocked the request (${[...new Set(cspHits)].join(', ')}) — the page is running somewhere that doesn't allow loading from script.google.com (for example a preview window); open it from your own web host or as a local file instead.` : '';
+    throw new Error(`${e1.message}. The fetch() fallback also failed (${why2}).${csp} Page is running from ${whereAmI()}`);
+  }
+}
+
 async function refreshInjuries(){
   try {
-    const d = await fetchJSONP(modeUrl('injuries'));
+    const d = await loadModel(modeUrl('injuries'));
+    if (d && d.error) throw new Error(d.error);          // keep the injuries already shown
     S.injuries = d.injuries || {};
     S.injUpdated = d.updated || d.generated || null;
     if (S.stamps && d.updated) { S.stamps.injuries = d.updated; if (d.source) S.stamps.injuriesSource = d.source; }
@@ -636,7 +661,8 @@ async function refreshInjuries(){
 }
 async function refreshLineups(){
   try {
-    const d = await fetchJSONP(modeUrl('lineups'));
+    const d = await loadModel(modeUrl('lineups'));
+    if (d && d.error) throw new Error(d.error);          // keep the lineups already shown
     S.lineups = d.lineups || {};
     S.luUpdated = d.updated || d.generated || null;
     if (S.stamps && d.updated) S.stamps.lineups = d.updated;
@@ -646,7 +672,10 @@ async function refreshLineups(){
 
 async function loadAll(){
   try {
-    const data = await fetchJSONP(WEBAPP_URL);
+    let data;
+    try { data = await loadModel(WEBAPP_URL); }
+    catch (first) { await new Promise(r => setTimeout(r, 1500)); data = await loadModel(WEBAPP_URL); }   // one quiet retry: Apps Script sometimes fails a cold start
+    if (data && data.error) throw new Error('the model sheet reported an error: ' + data.error);
     S.loaded = new Date();
     S.stamps = data.dataUpdated || null;
     S.generated = data.generated || null;
@@ -662,7 +691,7 @@ async function loadAll(){
     refreshInjuries().then(refreshLineups);
   } catch(e) {
     S.err = e;
-    $("#notice").innerHTML = `<div class="notice err"><p>Couldn't load the model data: ${esc(e.message||e)}.</p><button class="btn" id="nb">Try again</button></div>`;
+    $("#notice").innerHTML = `<div class="notice err"><p>Couldn't load the model data: ${esc(e.message||e)}.</p><button class="btn" id="nb">Try again</button> <a href="${esc(modeUrl('status'))}" target="_blank" rel="noopener" style="margin-left:10px">Open the sheet's status page</a></div>`;
     $("#nb").addEventListener("click", () => { $("#notice").innerHTML=""; loadAll(); });
     render();
   }
